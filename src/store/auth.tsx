@@ -1,9 +1,6 @@
 'use client'
 
-// 간단한 전역 auth 상태 (Zustand 없이 Context로 구현)
-// 실제 프로덕션에서는 zustand 또는 react-query 사용 권장
-
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createElement, createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 export type UserRole = 'buyer' | 'seller' | 'admin'
 
@@ -36,7 +33,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // sessionStorage에서 복원 (탭 유지)
     try {
       const saved = sessionStorage.getItem('linkers_user')
       const token = sessionStorage.getItem('linkers_at')
@@ -62,10 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('linkers_at')
   }
 
-  return (
-    <AuthContext.Provider value={{ user, accessToken, login, logout, isLoading }}>
-      {children}
-    </AuthContext.Provider>
+  // JSX 대신 createElement 사용 → 파일이 .ts로도 동작 가능
+  return createElement(
+    AuthContext.Provider,
+    { value: { user, accessToken, login, logout, isLoading } },
+    children
   )
 }
 
