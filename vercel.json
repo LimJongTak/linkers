@@ -1,0 +1,33 @@
+{
+  "framework": "nextjs",
+  "regions": ["icn1"],
+  "functions": {
+    "src/app/api/**": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "src/app/api/payments/webhook": {
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/health", "destination": "/api/health" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/settlements",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

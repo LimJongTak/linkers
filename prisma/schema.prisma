@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String?   @unique
+  nickname       String
+  role           UserRole  @default(buyer)
+  oauth_provider String
+  oauth_id       String
+  profile_image  String?
+  phone          String?
+  push_token     String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  programs    Program[]
+  orders      Order[]
+  reviews     Review[]
+  permissions DownloadPermission[]
+  settlements Settlement[]
+
+  @@unique([oauth_provider, oauth_id])
+  @@map("users")
+}
+
+model Program {
+  id               String        @id @default(uuid())
+  seller_id        String
+  title            String
+  subtitle         String?
+  category         String
+  target_levels    String[]
+  region           String[]
+  price            Int
+  description      String        @db.Text
+  thumbnail_url    String?
+  status           ProgramStatus @default(draft)
+  max_participants Int?
+  duration         String
+  tags             String[]
+  rating_avg       Decimal       @default(0) @db.Decimal(3, 2)
+  review_count     Int           @default(0)
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  seller  User          @relation(fields: [seller_id], references: [id])
+  files   ProgramFile[]
+  orders  Order[]
+  reviews Review[]
+
+  @@map("programs")
+}
+
+model ProgramFile {
+  id         String   @id @default(uuid())
+  program_id String
+  file_name  String
+  s3_key     String
+  file_size  BigInt
+  file_type  String
+  is_preview Boolean  @default(false)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+
+  program     Program              @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  permissions DownloadPermission[]
+
+  @@map("program_files")
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  order_number String      @unique
+  buyer_id     String
+  program_id   String
+  amount       Int
+  status       OrderStatus @default(pending)
+  payment_id   String      @unique
+  scheduled_at DateTime?
+  message      String?
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+
+  buyer       User                 @relation(fields: [buyer_id], references: [id])
+  program     Program              @relation(fields: [program_id], references: [id])
+  payment     Payment?
+  review      Review?
+  settlement  Settlement?
+  permissions DownloadPermission[]
+
+  @@map("orders")
+}
+
+model Payment {
+  id            String    @id @default(uuid())
+  order_id      String    @unique
+  pg_provider   String
+  pg_tid        String
+  imp_uid       String    @unique
+  paid_amount   Int
+  paid_at       DateTime
+  receipt_url   String?
+  refunded_at   DateTime?
+  refund_amount Int?
+  raw_response  Json
+
+  order Order @relation(fields: [order_id], references: [id])
+
+  @@map("payments")
+}
+
+model DownloadPermission {
+  id                 String    @id @default(uuid())
+  order_id           String
+  buyer_id           String
+  program_file_id    String
+  granted_at         DateTime  @default(now())
+  download_count     Int       @default(0)
+  max_downloads      Int       @default(5)
+  last_downloaded_at DateTime?
+  is_revoked         Boolean   @default(false)
+
+  order        Order          @relation(fields: [order_id], references: [id])
+  buyer        User           @relation(fields: [buyer_id], references: [id])
+  program_file ProgramFile    @relation(fields: [program_file_id], references: [id])
+  url_logs     SignedUrlLog[]
+
+  @@unique([order_id, program_file_id])
+  @@map("download_permissions")
+}
+
+model SignedUrlLog {
+  id               String   @id @default(uuid())
+  permission_id    String
+  signed_url_token String   @unique
+  expires_at       DateTime
+  is_used          Boolean  @default(false)
+  ip_address       String?
+  user_agent       String?
+  created_at       DateTime @default(now())
+
+  permission DownloadPermission @relation(fields: [permission_id], references: [id])
+
+  @@map("signed_url_logs")
+}
+
+model Settlement {
+  id           String           @id @default(uuid())
+  seller_id    String
+  order_id     String           @unique
+  gross_amount Int
+  fee_rate     Decimal          @default(0.1) @db.Decimal(5, 4)
+  fee_amount   Int
+  net_amount   Int
+  status       SettlementStatus @default(pending)
+  scheduled_at DateTime
+  settled_at   DateTime?
+  bank_name    String?
+  bank_account String?
+
+  seller User  @relation(fields: [seller_id], references: [id])
+  order  Order @relation(fields: [order_id], references: [id])
+
+  @@map("settlements")
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  order_id     String   @unique
+  buyer_id     String
+  program_id   String
+  rating       Int
+  content      String   @db.Text
+  photo_urls   String[]
+  is_visible   Boolean  @default(true)
+  helpful_count Int     @default(0)
+  created_at   DateTime @default(now())
+
+  order   Order   @relation(fields: [order_id], references: [id])
+  buyer   User    @relation(fields: [buyer_id], references: [id])
+  program Program @relation(fields: [program_id], references: [id])
+
+  @@map("reviews")
+}
+
+enum UserRole         { buyer seller admin }
+enum ProgramStatus    { draft active paused deleted }
+enum OrderStatus      { pending paid confirmed refunded cancelled }
+enum SettlementStatus { pending scheduled completed held }

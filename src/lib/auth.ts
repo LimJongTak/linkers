@@ -1,0 +1,48 @@
+import jwt from 'jsonwebtoken'
+import { NextRequest } from 'next/server'
+
+export interface JWTPayload {
+  userId: string
+  role: 'buyer' | 'seller' | 'admin'
+}
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+export function verifyAccessToken(req: NextRequest): JWTPayload {
+  const auth = req.headers.get('authorization')
+  if (!auth?.startsWith('Bearer ')) throw new ApiError(401, 'UNAUTHORIZED')
+
+  try {
+    return jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as JWTPayload
+  } catch (err: any) {
+    if (err.name === 'TokenExpiredError') throw new ApiError(401, 'TOKEN_EXPIRED')
+    throw new ApiError(401, 'INVALID_TOKEN')
+  }
+}
+
+export function issueTokens(payload: JWTPayload) {
+  const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: '15m' })
+  const refreshToken = jwt.sign(
+    { userId: payload.userId },
+    process.env.JWT_REFRESH_SECRET!,
+    { expiresIn: '7d' }
+  )
+  return { accessToken, refreshToken }
+}
+
+export function requireRole(user: JWTPayload, ...roles: string[]) {
+  if (!roles.includes(user.role)) throw new ApiError(403, 'FORBIDDEN')
+}
+
+export function handleError(err: unknown) {
+  if (err instanceof ApiError) {
+    return Response.json({ error: err.message }, { status: err.status })
+  }
+  console.error('[API Error]', err)
+  return Response.json({ error: 'Internal Server Error' }, { status: 500 })
+}
