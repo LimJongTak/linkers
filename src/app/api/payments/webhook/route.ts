@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server'
-import { PortOne } from '@portone/server-sdk'
+import { portone } from '@/lib/portone'
 import { db } from '@/lib/db'
 import { grantDownloadPermissions } from '@/lib/permissions'
 import { handleError } from '@/lib/auth'
 
-const portone = PortOne.init(process.env.PORTONE_API_SECRET!)
-
 export async function POST(req: NextRequest) {
   try {
+    if (!portone) return new Response('Service unavailable', { status: 503 })
+
     const body = await req.text() // raw body 필수 (서명 검증)
 
     let webhook: any
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
         process.env.PORTONE_WEBHOOK_SECRET!,
         body,
         {
-          'webhook-id': req.headers.get('webhook-id')!,
+          'webhook-id':        req.headers.get('webhook-id')!,
           'webhook-timestamp': req.headers.get('webhook-timestamp')!,
           'webhook-signature': req.headers.get('webhook-signature')!,
         }
@@ -29,15 +29,15 @@ export async function POST(req: NextRequest) {
     switch (webhook.type) {
       case 'Transaction.Paid': {
         const payment = await portone.payment.getPayment(webhook.data.paymentId)
-        const orderId = (payment as any).customData?.orderId
+        const orderId = payment.customData?.orderId
         if (!orderId) break
 
         await db.payment.upsert({
           where: { imp_uid: payment.paymentId },
           create: {
             order_id: orderId,
-            pg_provider: (payment as any).channel?.pgProvider ?? 'unknown',
-            pg_tid: (payment as any).pgTxId ?? '',
+            pg_provider: payment.channel?.pgProvider ?? 'unknown',
+            pg_tid: payment.pgTxId ?? '',
             imp_uid: payment.paymentId,
             paid_amount: payment.amount.total,
             paid_at: new Date(),
@@ -45,12 +45,10 @@ export async function POST(req: NextRequest) {
           },
           update: {},
         })
-
         await db.order.updateMany({
           where: { id: orderId, status: 'pending' },
           data: { status: 'paid' },
         })
-
         await grantDownloadPermissions(orderId)
         break
       }
@@ -61,11 +59,10 @@ export async function POST(req: NextRequest) {
           where: { payment: { imp_uid } },
           data: { status: 'refunded' },
         })
-        // 다운로드 권한 회수
-        const payment = await db.payment.findUnique({ where: { imp_uid } })
-        if (payment) {
+        const pmt = await db.payment.findUnique({ where: { imp_uid } })
+        if (pmt) {
           await db.downloadPermission.updateMany({
-            where: { order_id: payment.order_id },
+            where: { order_id: pmt.order_id },
             data: { is_revoked: true },
           })
         }
