@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server'
-import { PortOne } from '@portone/server-sdk'
+import { PortOneClient } from '@portone/server-sdk'
 import { db } from '@/lib/db'
 import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
 import { grantDownloadPermissions } from '@/lib/permissions'
 import { createSettlement } from '@/lib/settlements'
 import { sendPaymentCompleteNotifications } from '@/lib/kakao'
 
-const portone = PortOne.init(process.env.PORTONE_API_SECRET!)
+const portone = PortOneClient(process.env.PORTONE_API_SECRET!)
 
 export async function POST(req: NextRequest) {
   try {
