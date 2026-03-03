@@ -54,19 +54,28 @@ export default function ProgramDetailPage() {
     <div style={{ fontFamily: "'Pretendard Variable',Pretendard,-apple-system,sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;}
-        .tab-btn{padding:12px 20px;border:none;background:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:#9CA3AF;border-bottom:2px solid transparent;transition:all 0.15s;}
+        .tab-btn{padding:12px 16px;border:none;background:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:#9CA3AF;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap;}
         .tab-btn.on{color:#111827;border-bottom-color:#111827;}
+        .tab-bar{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        .tab-bar::-webkit-scrollbar{display:none;}
         .pay-method{padding:14px 16px;border-radius:12px;border:2px solid #E5E7EB;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:10px;background:#fff;}
         .pay-method.on{border-color:#111827;background:#F9FAFB;}
         .input-field{width:100%;padding:12px 14px;border-radius:10px;border:2px solid #E5E7EB;font-size:14px;font-family:inherit;outline:none;transition:border-color 0.15s;color:#111827;background:#fff;}
         .input-field:focus{border-color:#111827;}
-        @media(max-width:768px){.detail-grid{display:block!important;} .sticky-box{display:none!important;} .mobile-buy-bar{display:flex!important;}}
+        @media(max-width:768px){
+          .detail-grid{display:block!important;}
+          .sticky-box{display:none!important;}
+          .mobile-buy-bar{display:flex!important;}
+          .detail-padding{padding:16px 16px 80px!important;}
+          .review-header{flex-wrap:wrap;gap:4px!important;}
+          .meta-grid{grid-template-columns:1fr 1fr!important;}
+        }
         @media(min-width:769px){.mobile-buy-bar{display:none!important;}}
       `}</style>
 
       <Header />
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 80px' }}>
+      <div className="detail-padding" style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 80px' }}>
         {/* 뒤로가기 */}
         <Link href="/" style={{ fontSize: 13, color: '#6B7280', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
           ← 목록으로
@@ -110,7 +119,7 @@ export default function ProgramDetailPage() {
 
             {/* 탭 */}
             <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #F0EDE8', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', borderBottom: '1px solid #F0EDE8' }}>
+              <div className="tab-bar" style={{ display: 'flex', borderBottom: '1px solid #F0EDE8' }}>
                 {(['intro','curriculum','reviews'] as const).map(t => (
                   <button key={t} className={`tab-btn ${tab===t?'on':''}`} onClick={()=>setTab(t)}>
                     {t==='intro'?'소개':t==='curriculum'?'커리큘럼':`리뷰 (${p.reviewCount})`}
@@ -145,12 +154,12 @@ export default function ProgramDetailPage() {
                     </div>
                     {SAMPLE_REVIEWS.map((r, i) => (
                       <div key={i} style={{ borderBottom: '1px solid #F3F4F6', paddingBottom: 16, marginBottom: 16 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <div>
+                        <div className="review-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
                             <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{r.author}</span>
                             <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 8 }}>{r.role} · {r.date}</span>
                           </div>
-                          <div style={{ color: '#F59E0B' }}>{'★'.repeat(r.rating)}</div>
+                          <div style={{ color: '#F59E0B', flexShrink: 0 }}>{'★'.repeat(r.rating)}</div>
                         </div>
                         <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>{r.content}</p>
                       </div>

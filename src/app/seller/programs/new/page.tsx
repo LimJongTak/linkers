@@ -60,8 +60,14 @@ export default function ProgramRegisterPage() {
 
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
+      <style>{`
+        @media(max-width:640px){
+          .new-prog-main{padding:20px 16px 80px!important;}
+          .price-dur-grid{grid-template-columns:1fr!important;}
+        }
+      `}</style>
       <Header />
-      <main style={{ maxWidth: 640, margin: '0 auto', padding: '32px 24px 80px' }}>
+      <main className="new-prog-main" style={{ maxWidth: 640, margin: '0 auto', padding: '32px 24px 80px' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
           <Link href="/my" style={{ color: '#9CA3AF', textDecoration: 'none', fontSize: 22 }}>←</Link>
@@ -131,7 +137,7 @@ export default function ProgramRegisterPage() {
                 ))}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+            <div className="price-dur-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>가격 (원) *</label>
                 <input type="number" value={form.price} onChange={e => set('price', e.target.value)} placeholder="0 = 무료" style={INPUT} />
