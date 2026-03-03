@@ -2,22 +2,20 @@
 
 > 대학생이 만들고 학교가 활용하는 **교육 프로그램 중개 플랫폼**
 
-[![CI](https://github.com/your-org/linkers/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/linkers/actions)
-
 ---
 
 ## 기술 스택
 
 | 영역 | 기술 |
 |------|------|
-| 프레임워크 | Next.js 14 (App Router) |
+| 프레임워크 | Next.js 16 (App Router, Turbopack) |
 | 언어 | TypeScript |
-| DB | PostgreSQL + Prisma ORM |
-| 인증 | 카카오/구글 OAuth 2.0 + JWT |
-| 결제 | 포트원 v2 (카카오페이·카드·토스) |
-| 파일 | AWS S3 Presigned URL |
-| 알림 | 카카오 알림톡 + SMS 폴백 |
-| 배포 | Vercel (서울 리전) |
+| DB | PostgreSQL + Prisma ORM 5 |
+| 인증 | 카카오 OAuth 2.0 + JWT |
+| 결제 | 포트원 v2 (`@portone/server-sdk`) |
+| 파일 | AWS S3 + CloudFront Presigned URL |
+| 알림 | 카카오 알림톡 |
+| 배포 | Vercel |
 | 앱 | Capacitor (iOS / Android) |
 
 ---
@@ -27,7 +25,7 @@
 ### 1. 레포 클론
 
 ```bash
-git clone https://github.com/your-org/linkers.git
+git clone https://github.com/LimJongTak/linkers.git
 cd linkers
 npm install
 ```
@@ -67,12 +65,13 @@ npm run dev
 
 ```bash
 npm run dev              # 개발 서버
-npm run build            # 프로덕션 빌드
+npm run build            # prisma generate + 프로덕션 빌드
 npm run typecheck        # TypeScript 타입 검사
 npm run test             # 전체 테스트
 npm run test:coverage    # 커버리지 포함
 npm run db:migrate       # DB 마이그레이션 (개발)
 npm run db:migrate:prod  # DB 마이그레이션 (프로덕션)
+npm run db:generate      # Prisma Client 재생성
 npm run db:seed          # 샘플 데이터 삽입
 npm run build:app        # Capacitor 앱 빌드
 npm run open:ios         # Xcode 열기
@@ -107,7 +106,7 @@ npm run open:android     # Android Studio 열기
 ### 다운로드
 | Method | Path | 설명 | 인증 |
 |--------|------|------|------|
-| POST | `/api/downloads/:fileId/url` | Signed URL 발급 (5회 제한) | buyer |
+| POST | `/api/downloads/:fileId/url` | Signed URL 발급 (최대 5회) | buyer |
 
 ### 리뷰
 | Method | Path | 설명 | 인증 |
@@ -123,17 +122,40 @@ npm run open:android     # Android Studio 열기
 
 ---
 
-## GitHub Secrets 설정
+## 환경변수
 
-Vercel 자동 배포를 위해 아래 Secrets를 설정하세요:
+```env
+# DB
+DATABASE_URL=
 
-```
-VERCEL_TOKEN        — Vercel 계정 토큰
-VERCEL_ORG_ID       — Vercel 조직 ID
-VERCEL_PROJECT_ID   — Vercel 프로젝트 ID
-DATABASE_URL        — 프로덕션 RDS 연결 문자열
-SLACK_WEBHOOK_URL   — 배포 알림 (선택)
-CODECOV_TOKEN       — 커버리지 리포트 (선택)
+# JWT
+JWT_SECRET=
+
+# 카카오 OAuth
+KAKAO_CLIENT_ID=
+KAKAO_CLIENT_SECRET=
+KAKAO_REDIRECT_URI=
+
+# 포트원 v2
+PORTONE_API_SECRET=
+NEXT_PUBLIC_PORTONE_STORE_ID=
+NEXT_PUBLIC_PORTONE_KAKAO_KEY=
+NEXT_PUBLIC_PORTONE_CARD_KEY=
+
+# AWS S3 / CloudFront
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=
+AWS_S3_BUCKET=
+AWS_CLOUDFRONT_DOMAIN=
+
+# 카카오 알림톡
+KAKAO_ALIMTALK_KEY=
+KAKAO_ALIMTALK_SENDER=
+
+# 앱
+NEXT_PUBLIC_API_BASE=
+NEXT_PUBLIC_KAKAO_CLIENT_ID=
 ```
 
 ---
@@ -152,8 +174,13 @@ linkers/
 │   │   │   ├── downloads/
 │   │   │   ├── reviews/
 │   │   │   ├── admin/
-│   │   │   └── cron/
-│   │   └── (page routes)      # 프론트엔드 페이지
+│   │   │   └── health/
+│   │   ├── programs/          # 프로그램 상세 페이지
+│   │   ├── seller/            # 판매자 대시보드
+│   │   ├── admin/             # 관리자 페이지
+│   │   ├── my/                # 마이페이지 (주문·다운로드·리뷰)
+│   │   ├── login/             # 로그인
+│   │   └── page.tsx           # 홈
 │   ├── lib/                   # 공통 유틸
 │   │   ├── db.ts              # Prisma 클라이언트
 │   │   ├── auth.ts            # JWT 헬퍼
@@ -163,14 +190,15 @@ linkers/
 │   │   └── settlements.ts     # 정산
 │   └── middleware.ts          # CORS + 보안 헤더
 ├── prisma/
-│   ├── schema.prisma          # DB 스키마 (9개 테이블)
+│   ├── schema.prisma          # DB 스키마
 │   └── seed.ts                # 샘플 데이터
 ├── __tests__/
 │   ├── unit/                  # 단위 테스트
 │   ├── integration/           # 통합 테스트
-│   └── helpers/factories.ts   # 테스트 데이터 팩토리
-├── .github/workflows/ci.yml   # CI/CD 파이프라인
-├── docker-compose.yml         # 로컬 DB
+│   └── helpers/               # 테스트 데이터 팩토리
+├── docker-compose.yml         # 로컬 DB (PostgreSQL)
+├── jest.config.ts             # Jest 설정
+├── next.config.js             # Next.js 설정
 ├── vercel.json                # Vercel 배포 설정
-└── .env.example               # 환경변수 템플릿
+└── tailwind.config.ts         # Tailwind CSS 설정
 ```
