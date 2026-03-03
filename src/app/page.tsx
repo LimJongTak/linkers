@@ -43,7 +43,7 @@ export default function HomePage() {
         .chip{padding:7px 16px;border-radius:20px;border:1.5px solid #E5E7EB;background:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;font-family:inherit;color:#374151;white-space:nowrap;}
         .chip.on{background:#111827;color:#fff;border-color:#111827;}
         .chip:hover:not(.on){border-color:#9CA3AF;}
-        .sort-btn{padding:7px 14px;border-radius:8px;border:1.5px solid #E5E7EB;background:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s;}
+        .sort-btn{padding:7px 14px;border-radius:8px;border:1.5px solid #E5E7EB;background:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s;white-space:nowrap;}
         .sort-btn.on{background:#111827;color:#fff;border-color:#111827;}
         .card{background:#fff;border-radius:18px;border:1px solid #F0EDE8;overflow:hidden;transition:all 0.2s;display:flex;flex-direction:column;text-decoration:none;color:inherit;}
         .card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.10);transform:translateY(-3px);}
@@ -51,13 +51,24 @@ export default function HomePage() {
         .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;}
         .fscroll{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
         .fscroll::-webkit-scrollbar{display:none;}
-        @media(max-width:640px){.pgrid{grid-template-columns:1fr;}}
+        .filter-spacer{flex:1;min-width:0;}
+        .sort-section{display:contents;}
+        @media(max-width:640px){
+          .pgrid{grid-template-columns:1fr;}
+          .filter-spacer{display:none!important;}
+          .sort-section{display:flex!important;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:2px;margin-top:6px;}
+          .sort-section::-webkit-scrollbar{display:none;}
+          .filter-bar-padding{padding:10px 16px!important;}
+          .hero-section{padding:36px 16px 32px!important;}
+          .hero-stats{gap:20px!important;}
+          .main-padding{padding:20px 16px 60px!important;}
+        }
       `}</style>
 
       <Header />
 
       {/* 히어로 */}
-      <section style={{background:'linear-gradient(135deg,#111827 0%,#1F2D45 60%,#111827 100%)',padding:'52px 24px 48px',textAlign:'center',position:'relative',overflow:'hidden'}}>
+      <section className="hero-section" style={{background:'linear-gradient(135deg,#111827 0%,#1F2D45 60%,#111827 100%)',padding:'52px 24px 48px',textAlign:'center',position:'relative',overflow:'hidden'}}>
         <div style={{position:'absolute',inset:0,backgroundImage:'radial-gradient(circle at 20% 80%,rgba(79,195,247,0.12) 0%,transparent 50%),radial-gradient(circle at 80% 20%,rgba(139,92,246,0.08) 0%,transparent 50%)'}} />
         <div style={{position:'relative',maxWidth:640,margin:'0 auto'}}>
           <div style={{display:'inline-block',background:'rgba(79,195,247,0.15)',color:'#4FC3F7',fontSize:12,fontWeight:800,padding:'5px 14px',borderRadius:20,marginBottom:16}}>대학생 × 학교 연결 플랫폼</div>
@@ -70,7 +81,7 @@ export default function HomePage() {
               style={{width:'100%',padding:'14px 52px 14px 20px',borderRadius:14,border:'none',fontSize:15,fontFamily:'inherit',outline:'none',fontWeight:500,background:'rgba(255,255,255,0.95)',color:'#111827'}} />
             <span style={{position:'absolute',right:16,top:'50%',transform:'translateY(-50%)',fontSize:20,opacity:0.4}}>🔍</span>
           </div>
-          <div style={{display:'flex',justifyContent:'center',gap:32,marginTop:28}}>
+          <div className="hero-stats" style={{display:'flex',justifyContent:'center',gap:32,marginTop:28}}>
             {[['142+','등록 프로그램'],['2,800+','누적 구매'],['4.9★','평균 별점']].map(([v,l])=>(
               <div key={l} style={{textAlign:'center'}}>
                 <div style={{fontSize:20,fontWeight:900,color:'#fff'}}>{v}</div>
@@ -82,7 +93,7 @@ export default function HomePage() {
       </section>
 
       {/* 필터 */}
-      <div style={{background:'#fff',borderBottom:'1px solid #F0EDE8',padding:'14px 24px'}}>
+      <div className="filter-bar-padding" style={{background:'#fff',borderBottom:'1px solid #F0EDE8',padding:'14px 24px'}}>
         <div style={{maxWidth:1200,margin:'0 auto'}}>
           <div className="fscroll" style={{marginBottom:10}}>
             {CATEGORIES.map(c=><button key={c} className={`chip ${cat===c?'on':''}`} onClick={()=>setCat(c)}>{c}</button>)}
@@ -93,8 +104,8 @@ export default function HomePage() {
             <div style={{width:1,height:18,background:'#E5E7EB',margin:'0 4px'}} />
             <span style={{fontSize:12,color:'#9CA3AF',fontWeight:700}}>지역</span>
             {REGIONS.map(r=><button key={r} className={`chip ${rgn===r?'on':''}`} style={{padding:'5px 12px',fontSize:12}} onClick={()=>setRgn(r)}>{r}</button>)}
-            <div style={{flex:1}} />
-            <div className="fscroll" style={{gap:6}}>
+            <div className="filter-spacer" style={{flex:1}} />
+            <div className="sort-section" style={{display:'contents'}}>
               {SORTS.map(([v,l])=><button key={v} className={`sort-btn ${srt===v?'on':''}`} onClick={()=>setSrt(v)}>{l}</button>)}
             </div>
           </div>
@@ -102,7 +113,7 @@ export default function HomePage() {
       </div>
 
       {/* 목록 */}
-      <main style={{maxWidth:1200,margin:'0 auto',padding:'28px 24px 60px'}}>
+      <main className="main-padding" style={{maxWidth:1200,margin:'0 auto',padding:'28px 24px 60px'}}>
         <div style={{fontSize:14,color:'#6B7280',marginBottom:20}}>
           총 <strong style={{color:'#111827'}}>{list.length}</strong>개 프로그램
           {q&&<span style={{marginLeft:4}}>— &ldquo;<strong>{q}</strong>&rdquo;</span>}

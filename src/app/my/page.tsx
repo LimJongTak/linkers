@@ -31,25 +31,32 @@ export default function MyPage() {
 
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
+      <style>{`
+        @media(max-width:640px){
+          .my-main{padding:20px 16px 60px!important;}
+          .my-profile{padding:20px!important;gap:14px!important;}
+          .my-menu-grid{grid-template-columns:1fr 1fr!important;}
+        }
+      `}</style>
       <Header />
 
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '32px 24px 60px' }}>
+      <main className="my-main" style={{ maxWidth: 680, margin: '0 auto', padding: '32px 24px 60px' }}>
         {/* 프로필 카드 */}
-        <div style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', borderRadius: 24, padding: 28, marginBottom: 24, display: 'flex', gap: 20, alignItems: 'center' }}>
+        <div className="my-profile" style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', borderRadius: 24, padding: 28, marginBottom: 24, display: 'flex', gap: 20, alignItems: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #4FC3F7, #667EEA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{user.nickname[0]}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 2 }}>{user.nickname}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nickname}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
               {user.role === 'buyer' ? '구매자 계정' : user.role === 'seller' ? '판매자 계정' : '관리자 계정'}
             </div>
           </div>
-          <div style={{ background: 'rgba(79,195,247,0.2)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 8 }}>
+          <div style={{ background: 'rgba(79,195,247,0.2)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 8, flexShrink: 0 }}>
             {user.role === 'buyer' ? '구매자' : user.role === 'seller' ? '판매자' : 'ADMIN'}
           </div>
         </div>
 
         {/* 메뉴 그리드 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <div className="my-menu-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
           {menus.map(m => (
             <Link key={m.href} href={m.href} style={{
               background: '#fff', borderRadius: 16, padding: '20px', textDecoration: 'none',

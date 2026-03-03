@@ -44,19 +44,36 @@ export default function SellerDashboardPage() {
 
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
+      <style>{`
+        @media(max-width:640px){
+          .dash-main{padding:20px 16px 60px!important;}
+          .dash-header{flex-wrap:wrap;gap:10px!important;}
+          .dash-tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+          .dash-tab-bar::-webkit-scrollbar{display:none;}
+          .dash-tab-btn{white-space:nowrap;padding:10px 14px!important;font-size:13px!important;}
+          .kpi-grid{grid-template-columns:1fr 1fr!important;}
+          .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+          .table-wrap table{min-width:480px;}
+          .settle-grid{grid-template-columns:1fr!important;}
+          .recent-order-row{flex-direction:column;align-items:flex-start!important;gap:8px!important;}
+          .recent-order-right{width:100%;display:flex;justify-content:space-between;align-items:center;}
+          .program-row{flex-wrap:wrap;}
+          .program-row-actions{margin-top:8px;width:100%;display:flex;justify-content:flex-end;}
+        }
+      `}</style>
       <Header />
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <main className="dash-main" style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px' }}>
+        <div className="dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, fontWeight: 900, color: '#111827' }}>판매자 대시보드</h1>
-          <Link href="/seller/programs/new" style={{ background: '#111827', color: '#fff', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
+          <Link href="/seller/programs/new" style={{ background: '#111827', color: '#fff', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
             + 프로그램 등록
           </Link>
         </div>
 
         {/* 탭 */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #F0EDE8', paddingBottom: 0 }}>
-          {[['overview','대시보드'],['programs','프로그램'],['orders','주문 내역'],['settlements','정산']] .map(([v,l]) => (
-            <button key={v} onClick={() => setTab(v as any)} style={{ padding: '10px 18px', border: 'none', background: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', color: tab===v?'#111827':'#9CA3AF', borderBottom: `2px solid ${tab===v?'#111827':'transparent'}`, marginBottom: -1 }}>
+        <div className="dash-tab-bar" style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #F0EDE8', paddingBottom: 0 }}>
+          {[['overview','대시보드'],['programs','프로그램'],['orders','주문 내역'],['settlements','정산']].map(([v,l]) => (
+            <button key={v} onClick={() => setTab(v as any)} className="dash-tab-btn" style={{ padding: '10px 18px', border: 'none', background: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', color: tab===v?'#111827':'#9CA3AF', borderBottom: `2px solid ${tab===v?'#111827':'transparent'}`, marginBottom: -1, flexShrink: 0 }}>
               {l}
             </button>
           ))}
@@ -65,7 +82,7 @@ export default function SellerDashboardPage() {
         {/* 대시보드 */}
         {tab === 'overview' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
+            <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
               {KPI.map(k => (
                 <div key={k.label} style={{ background: '#fff', borderRadius: 16, padding: '20px', border: '1px solid #F0EDE8' }}>
                   <div style={{ fontSize: 24, marginBottom: 8 }}>{k.icon}</div>
@@ -80,12 +97,12 @@ export default function SellerDashboardPage() {
               {ORDERS.slice(0, 3).map(o => {
                 const s = STATUS_STYLE[o.status]
                 return (
-                  <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3F4F6' }}>
-                    <div>
+                  <div key={o.id} className="recent-order-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3F4F6' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{o.buyer}</div>
                       <div style={{ fontSize: 12, color: '#9CA3AF' }}>{o.program} · {o.date}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="recent-order-right" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                       <span style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>{o.amount.toLocaleString()}원</span>
                       <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 6, background: s.bg, color: s.color }}>{s.label}</span>
                     </div>
@@ -120,7 +137,7 @@ export default function SellerDashboardPage() {
 
         {/* 주문 내역 */}
         {tab === 'orders' && (
-          <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #F0EDE8', overflow: 'hidden' }}>
+          <div className="table-wrap" style={{ background: '#fff', borderRadius: 20, border: '1px solid #F0EDE8', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F9FAFB' }}>
@@ -150,7 +167,7 @@ export default function SellerDashboardPage() {
         {/* 정산 */}
         {tab === 'settlements' && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            <div className="settle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
               {[['정산 예정', '₩1,620,000', '이번달 말'], ['정산 완료', '₩8,400,000', '누적']].map(([l,v,s])=>(
                 <div key={l} style={{ background: '#fff', borderRadius: 16, padding: 20, border: '1px solid #F0EDE8' }}>
                   <div style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 4 }}>{l}</div>

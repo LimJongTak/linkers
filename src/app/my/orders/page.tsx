@@ -29,8 +29,14 @@ export default function MyOrdersPage() {
 
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
+      <style>{`
+        @media(max-width:640px){
+          .orders-main{padding:20px 16px 60px!important;}
+          .order-number{font-size:11px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;}
+        }
+      `}</style>
       <Header />
-      <main style={{ maxWidth: 760, margin: '0 auto', padding: '32px 24px 60px' }}>
+      <main className="orders-main" style={{ maxWidth: 760, margin: '0 auto', padding: '32px 24px 60px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <Link href="/my" style={{ color: '#9CA3AF', textDecoration: 'none', fontSize: 22 }}>←</Link>
           <h1 style={{ fontSize: 22, fontWeight: 900, color: '#111827' }}>구매 내역</h1>
@@ -40,21 +46,21 @@ export default function MyOrdersPage() {
           const s = STATUS_LABEL[o.status]
           return (
             <div key={o.id} style={{ background: '#fff', borderRadius: 18, padding: 20, border: '1px solid #F0EDE8', marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 2 }}>{o.orderNumber} · {o.date}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="order-number" style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 2 }}>{o.orderNumber} · {o.date}</div>
                   <div style={{ fontSize: 11, color: '#6B7280' }}>진행 예정: {o.scheduledAt}</div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 7, background: s.bg, color: s.color }}>{s.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 7, background: s.bg, color: s.color, flexShrink: 0 }}>{s.label}</span>
               </div>
 
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{o.program.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <Link href={`/programs/${o.program.id}`} style={{ fontSize: 15, fontWeight: 800, color: '#111827', textDecoration: 'none' }}>{o.program.title}</Link>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link href={`/programs/${o.program.id}`} style={{ fontSize: 15, fontWeight: 800, color: '#111827', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.program.title}</Link>
                   <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 1 }}>{o.program.seller} · {o.program.university}</div>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: '#111827' }}>{o.amount.toLocaleString()}원</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#111827', flexShrink: 0 }}>{o.amount.toLocaleString()}원</div>
               </div>
 
               {o.status === 'confirmed' && (

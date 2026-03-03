@@ -7,17 +7,24 @@ import { SELLERS, PROGRAMS } from '@/store/data'
 export default function SellersPage() {
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
+      <style>{`
+        @media(max-width:640px){
+          .sellers-hero{padding:32px 16px!important;}
+          .sellers-main{padding:20px 16px 60px!important;}
+          .seller-grid{grid-template-columns:1fr!important;}
+        }
+      `}</style>
       <Header />
 
       {/* 히어로 */}
-      <section style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', padding: '44px 24px', textAlign: 'center' }}>
+      <section className="sellers-hero" style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', padding: '44px 24px', textAlign: 'center' }}>
         <div style={{ display: 'inline-block', background: 'rgba(79,195,247,0.15)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 14px', borderRadius: 20, marginBottom: 14 }}>인기 판매자</div>
         <h1 style={{ fontSize: 'clamp(22px,4vw,34px)', fontWeight: 900, color: '#fff', marginBottom: 10 }}>검증된 대학생 판매자</h1>
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>직접 진행하고 리뷰로 검증받은 신뢰할 수 있는 판매자들</p>
       </section>
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '36px 24px 60px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+      <main className="sellers-main" style={{ maxWidth: 1100, margin: '0 auto', padding: '36px 24px 60px' }}>
+        <div className="seller-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
           {SELLERS.map(s => {
             const sellerPrograms = PROGRAMS.filter(p => p.seller === s.name)
             return (
