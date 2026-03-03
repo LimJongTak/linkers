@@ -190,7 +190,30 @@ model Review {
   @@map("reviews")
 }
 
-enum UserRole         { buyer seller admin }
-enum ProgramStatus    { draft active paused deleted }
-enum OrderStatus      { pending paid confirmed refunded cancelled }
-enum SettlementStatus { pending scheduled completed held }
+enum UserRole {
+  buyer
+  seller
+  admin
+}
+
+enum ProgramStatus {
+  draft
+  active
+  paused
+  deleted
+}
+
+enum OrderStatus {
+  pending
+  paid
+  confirmed
+  refunded
+  cancelled
+}
+
+enum SettlementStatus {
+  pending
+  scheduled
+  completed
+  held
+}
