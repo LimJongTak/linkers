@@ -6,7 +6,7 @@ import { grantDownloadPermissions } from '@/lib/permissions'
 import { createSettlement } from '@/lib/settlements'
 import { sendPaymentCompleteNotifications } from '@/lib/kakao'
 
-const portone = new PortOneClient({ apiSecret: process.env.PORTONE_API_SECRET! })
+const portone = PortOneClient(process.env.PORTONE_API_SECRET!)
 
 export async function POST(req: NextRequest) {
   try {
