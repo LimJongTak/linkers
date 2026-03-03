@@ -5,16 +5,17 @@ import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
+    const { fileId } = await params
     const user = verifyAccessToken(req)
 
     // 1. 권한 확인
     const permission = await db.downloadPermission.findFirst({
       where: {
         buyer_id: user.userId,
-        program_file_id: params.fileId,
+        program_file_id: fileId,
         is_revoked: false,
       },
       include: { program_file: true },

@@ -5,14 +5,15 @@ import { sendAlimtalk } from '@/lib/kakao'
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = verifyAccessToken(req)
     requireRole(user, 'admin')
 
     const program = await db.program.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'active' },
       include: { seller: true },
     })
@@ -33,9 +34,10 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = verifyAccessToken(req)
     requireRole(user, 'admin')
 
@@ -43,7 +45,7 @@ export async function DELETE(
     const reason = body.reason ?? '관리자 반려'
 
     await db.program.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'deleted' },
     })
 
