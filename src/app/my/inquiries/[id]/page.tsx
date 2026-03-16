@@ -49,7 +49,7 @@ export default function InquiryDetailPage() {
 
   const canReply = user && inquiry && inquiry.status !== 'closed' && (
     user.role === 'admin' || user.role === 'manager' ||
-    inquiry.user_id === user.id ||
+    inquiry.user.id === user.id ||
     (user.role === 'seller' && inquiry.program?.seller_id === user.id)
   )
 
