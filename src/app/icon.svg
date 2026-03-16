@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 배경 -->
+  <rect width="32" height="32" rx="7" fill="#111827"/>
+  <!-- L 세로 획 -->
+  <rect x="7" y="6" width="5" height="19" rx="2" fill="white"/>
+  <!-- L 가로 획 -->
+  <rect x="7" y="21" width="15" height="5" rx="2" fill="white"/>
+  <!-- 브랜드 블루 점 -->
+  <circle cx="25" cy="9" r="4.5" fill="#4FC3F7"/>
+</svg>
