@@ -184,8 +184,8 @@ export default function Header() {
             </>
           ) : (
             <>
-              <Link href="/login" className="hdr-kakao-btn">
-                <span style={{ fontSize: 16 }}>💬</span> 카카오 로그인
+              <Link href="/login" className="hdr-sell-btn">
+                로그인
               </Link>
               <Link href="/seller/programs/new" className="hdr-sell-btn desktop-only">
                 프로그램 등록 →
@@ -238,7 +238,7 @@ export default function Header() {
                 </button>
               </>
             ) : (
-              <Link href="/login" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>💬 카카오 로그인</Link>
+              <Link href="/login" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>🔑 로그인</Link>
             )}
           </div>
         </div>
