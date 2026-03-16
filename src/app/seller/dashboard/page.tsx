@@ -194,7 +194,7 @@ export default function SellerDashboardPage() {
                     <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }}
                       tickFormatter={v => chartPeriod === 'daily' ? v.slice(5) : v} />
                     <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} width={36} />
-                    <Tooltip formatter={(v: number) => [`${v.toLocaleString()}원`, '매출']}
+                    <Tooltip formatter={(v) => [`${Number(v).toLocaleString()}원`, '매출']}
                       labelStyle={{ fontSize: 12 }} contentStyle={{ borderRadius: 10, border: '1px solid #F0EDE8', fontSize: 13 }} />
                     <Area type="monotone" dataKey="revenue" stroke="#111827" strokeWidth={2} fill="url(#sellerGrad)" dot={false} />
                   </AreaChart>

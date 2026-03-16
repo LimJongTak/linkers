@@ -135,8 +135,8 @@ function DashTab({ token, onTabChange }: { token: string | null; onTabChange: (t
                 tickFormatter={v => v >= 10000 ? `${Math.floor(v / 10000)}만` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} width={44} />
               <YAxis yAxisId="ord" orientation="right" tick={{ fontSize: 10, fill: '#9CA3AF' }} width={28} />
               <Tooltip
-                formatter={(v: number, name: string) => [
-                  name === 'revenue' ? `${v.toLocaleString()}원` : `${v}건`,
+                formatter={(v, name) => [
+                  name === 'revenue' ? `${Number(v).toLocaleString()}원` : `${v}건`,
                   name === 'revenue' ? '매출' : '주문수'
                 ]}
                 labelStyle={{ fontSize: 12 }}
