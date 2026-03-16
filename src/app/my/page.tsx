@@ -1,32 +1,40 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { useAuth } from '@/store/auth'
 
 export default function MyPage() {
-  const { user, logout } = useAuth()
+  const { user, logout, accessToken } = useAuth()
   const router = useRouter()
+  const [points, setPoints] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (!user) { router.replace('/login'); return }
+    fetch('/api/points', { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(r => r.json())
+      .then(d => setPoints(d.points ?? 0))
+      .catch(() => {})
+  }, [user, accessToken, router])
 
   if (!user) return null
 
   const menus = [
-    { href: '/my/orders',    icon: '📋', label: '구매 내역',     desc: '신청한 프로그램 확인' },
-    { href: '/my/downloads', icon: '⬇️', label: '다운로드',      desc: '자료 다운로드 (최대 5회)' },
-    { href: '/my/reviews',   icon: '⭐', label: '내 리뷰',       desc: '작성한 리뷰 관리' },
-    ...(user.role === 'seller' ? [
-      { href: '/seller/dashboard',     icon: '📊', label: '판매자 대시보드', desc: '수익·주문·프로그램 관리' },
-      { href: '/seller/programs/new',  icon: '➕', label: '프로그램 등록',   desc: '새 프로그램 등록하기' },
-    ] : [
-      { href: '/seller/programs/new', icon: '🚀', label: '판매자 시작하기', desc: '내 프로그램 등록하고 수익 내기' },
-    ]),
-    ...(user.role === 'admin' ? [{ href: '/admin', icon: '⚙️', label: '관리자 콘솔', desc: '시스템 전체 관리' }] : []),
+    { href: '/my/points',            icon: '💰', label: '포인트',         desc: `보유 ${points !== null ? points.toLocaleString() + 'P' : '—'}` },
+    { href: '/my/cart',              icon: '🛒', label: '장바구니',        desc: '담아둔 프로그램 한 번에 결제' },
+    { href: '/my/orders',            icon: '📋', label: '구매 내역',      desc: '신청한 프로그램 확인' },
+    { href: '/my/wishlist',          icon: '❤️', label: '찜 목록',         desc: '관심 프로그램 모아보기' },
+    { href: '/my/coupons',           icon: '🎟', label: '내 쿠폰',           desc: user.role === 'admin' || user.role === 'manager' ? '쿠폰 발급 · 관리' : '쿠폰 등록 · 사용' },
+    { href: '/my/inquiries',         icon: '💬', label: '1:1 문의',       desc: '판매자 · 관리자 문의 내역' },
+    { href: '/my/notifications',     icon: '🔔', label: '알림 센터',      desc: '주문 · 환전 · 답변 알림' },
+    { href: '/my/downloads',         icon: '⬇️', label: '다운로드',       desc: '자료 다운로드 (최대 5회)' },
+    { href: '/my/reviews',           icon: '⭐', label: '내 리뷰',        desc: '작성한 리뷰 관리' },
+    { href: '/my/programs',          icon: '📦', label: '내 프로그램',    desc: '등록한 프로그램 관리' },
+    { href: '/my/sales',             icon: '💸', label: '판매 내역 · 수익금', desc: '판매 현황 및 환전 신청' },
+    { href: '/seller/programs/new',  icon: '➕', label: '프로그램 등록',  desc: '새 프로그램 등록하기' },
+    ...((user.role === 'admin' || user.role === 'manager') ? [{ href: '/admin', icon: '⚙️', label: user.role === 'admin' ? '관리자 콘솔' : '매니저 콘솔', desc: '시스템 전체 관리' }] : []),
   ]
 
   return (
@@ -42,18 +50,38 @@ export default function MyPage() {
 
       <main className="my-main" style={{ maxWidth: 680, margin: '0 auto', padding: '32px 24px 60px' }}>
         {/* 프로필 카드 */}
-        <div className="my-profile" style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', borderRadius: 24, padding: 28, marginBottom: 24, display: 'flex', gap: 20, alignItems: 'center' }}>
+        <div className="my-profile" style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', borderRadius: 24, padding: 28, marginBottom: 16, display: 'flex', gap: 20, alignItems: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #4FC3F7, #667EEA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{user.nickname[0]}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nickname}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-              {user.role === 'buyer' ? '구매자 계정' : user.role === 'seller' ? '판매자 계정' : '관리자 계정'}
+              {user.role === 'admin' ? '관리자 계정' : user.role === 'manager' ? '매니저 계정' : '구매 · 판매 계정'}
             </div>
           </div>
           <div style={{ background: 'rgba(79,195,247,0.2)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 8, flexShrink: 0 }}>
-            {user.role === 'buyer' ? '구매자' : user.role === 'seller' ? '판매자' : 'ADMIN'}
+            {user.role === 'admin' ? 'ADMIN' : user.role === 'manager' ? 'MANAGER' : '회원'}
           </div>
         </div>
+
+        {/* 포인트 배너 */}
+        <Link href="/my/points" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'linear-gradient(90deg,#4F46E5,#7C3AED)', borderRadius: 16,
+          padding: '16px 20px', marginBottom: 24, textDecoration: 'none',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>💰</span>
+            <div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>보유 포인트</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>
+                {points !== null ? points.toLocaleString() : '—'}<span style={{ fontSize: 13, marginLeft: 4, opacity: 0.8 }}>P</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '8px 14px', borderRadius: 8 }}>
+            충전하기 →
+          </div>
+        </Link>
 
         {/* 메뉴 그리드 */}
         <div className="my-menu-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>

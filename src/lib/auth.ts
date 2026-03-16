@@ -1,9 +1,26 @@
 import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
+import { scryptSync, randomBytes, timingSafeEqual } from 'crypto'
+
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(password, salt, 64).toString('hex')
+  return `${salt}:${hash}`
+}
+
+export function verifyPassword(password: string, stored: string): boolean {
+  try {
+    const [salt, hash] = stored.split(':')
+    const buf = scryptSync(password, salt, 64)
+    return timingSafeEqual(Buffer.from(hash, 'hex'), buf)
+  } catch {
+    return false
+  }
+}
 
 export interface JWTPayload {
   userId: string
-  role: 'buyer' | 'seller' | 'admin'
+  role: 'buyer' | 'seller' | 'manager' | 'admin'
 }
 
 export class ApiError extends Error {
@@ -43,6 +60,9 @@ export function handleError(err: unknown) {
   if (err instanceof ApiError) {
     return Response.json({ error: err.message }, { status: err.status })
   }
+  const message = err instanceof Error ? err.message : String(err)
   console.error('[API Error]', err)
-  return Response.json({ error: 'Internal Server Error' }, { status: 500 })
+  // dev 환경에서는 실제 에러 메시지 노출
+  const detail = process.env.NODE_ENV !== 'production' ? message : undefined
+  return Response.json({ error: 'Internal Server Error', detail }, { status: 500 })
 }

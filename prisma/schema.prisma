@@ -14,17 +14,32 @@ model User {
   role           UserRole  @default(buyer)
   oauth_provider String
   oauth_id       String
+  password_hash  String?
   profile_image  String?
   phone          String?
   push_token     String?
+  points         Int       @default(0)
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  programs    Program[]
-  orders      Order[]
-  reviews     Review[]
-  permissions DownloadPermission[]
-  settlements Settlement[]
+  programs           Program[]
+  orders             Order[]
+  reviews            Review[]
+  permissions        DownloadPermission[]
+  settlements        Settlement[]
+  point_transactions PointTransaction[]
+  withdrawals        Withdrawal[]
+  notices            Notice[]
+  wishlists          Wishlist[]
+  coupons_created    Coupon[]      @relation("CouponCreator")
+  coupon_usages      CouponUsage[]
+  user_coupons       UserCoupon[]
+  cart_items         CartItem[]
+  inquiries          Inquiry[]
+  inquiry_replies    InquiryReply[]
+  notifications      Notification[]
+  reports_submitted  Report[]       @relation("ReportReporter")
+  reports_reviewed   Report[]       @relation("ReportReviewer")
 
   @@unique([oauth_provider, oauth_id])
   @@map("users")
@@ -33,6 +48,7 @@ model User {
 model Program {
   id               String        @id @default(uuid())
   seller_id        String
+  product_type     ProductType   @default(file_product)
   title            String
   subtitle         String?
   category         String
@@ -41,19 +57,27 @@ model Program {
   price            Int
   description      String        @db.Text
   thumbnail_url    String?
+  preview_url      String?
   status           ProgramStatus @default(draft)
+  file_format      String?
+  page_count       Int?
   max_participants Int?
-  duration         String
+  duration         String?
   tags             String[]
   rating_avg       Decimal       @default(0) @db.Decimal(3, 2)
   review_count     Int           @default(0)
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
 
-  seller  User          @relation(fields: [seller_id], references: [id])
-  files   ProgramFile[]
-  orders  Order[]
-  reviews Review[]
+  seller     User          @relation(fields: [seller_id], references: [id])
+  files      ProgramFile[]
+  orders     Order[]
+  reviews    Review[]
+  wishlists  Wishlist[]
+  coupons    Coupon[]
+  cart_items CartItem[]
+  inquiries  Inquiry[]
+  reports    Report[]
 
   @@map("programs")
 }
@@ -76,24 +100,28 @@ model ProgramFile {
 }
 
 model Order {
-  id           String      @id @default(uuid())
-  order_number String      @unique
-  buyer_id     String
-  program_id   String
-  amount       Int
-  status       OrderStatus @default(pending)
-  payment_id   String      @unique
-  scheduled_at DateTime?
-  message      String?
-  created_at   DateTime    @default(now())
-  updated_at   DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  order_number   String      @unique
+  buyer_id       String
+  program_id     String
+  amount         Int
+  point_amount   Int         @default(0)
+  payment_method String      @default("card")
+  status         OrderStatus @default(pending)
+  payment_id     String      @unique
+  scheduled_at     DateTime?
+  message          String?
+  coupon_discount  Int         @default(0)
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
 
-  buyer       User                 @relation(fields: [buyer_id], references: [id])
-  program     Program              @relation(fields: [program_id], references: [id])
-  payment     Payment?
-  review      Review?
-  settlement  Settlement?
-  permissions DownloadPermission[]
+  buyer         User                 @relation(fields: [buyer_id], references: [id])
+  program       Program              @relation(fields: [program_id], references: [id])
+  payment       Payment?
+  review        Review?
+  settlement    Settlement?
+  permissions   DownloadPermission[]
+  coupon_usage  CouponUsage?
 
   @@map("orders")
 }
@@ -172,16 +200,16 @@ model Settlement {
 }
 
 model Review {
-  id           String   @id @default(uuid())
-  order_id     String   @unique
-  buyer_id     String
-  program_id   String
-  rating       Int
-  content      String   @db.Text
-  photo_urls   String[]
-  is_visible   Boolean  @default(true)
-  helpful_count Int     @default(0)
-  created_at   DateTime @default(now())
+  id            String   @id @default(uuid())
+  order_id      String   @unique
+  buyer_id      String
+  program_id    String
+  rating        Int
+  content       String   @db.Text
+  photo_urls    String[]
+  is_visible    Boolean  @default(true)
+  helpful_count Int      @default(0)
+  created_at    DateTime @default(now())
 
   order   Order   @relation(fields: [order_id], references: [id])
   buyer   User    @relation(fields: [buyer_id], references: [id])
@@ -190,9 +218,229 @@ model Review {
   @@map("reviews")
 }
 
+model PointTransaction {
+  id           String               @id @default(uuid())
+  user_id      String
+  amount       Int
+  type         PointTransactionType
+  description  String
+  reference_id String?
+  created_at   DateTime             @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("point_transactions")
+}
+
+model Withdrawal {
+  id             String           @id @default(uuid())
+  seller_id      String
+  amount         Int
+  bank_name      String
+  account_number String
+  account_holder String
+  status         WithdrawalStatus @default(pending)
+  admin_note     String?
+  requested_at   DateTime         @default(now())
+  processed_at   DateTime?
+
+  seller User @relation(fields: [seller_id], references: [id])
+
+  @@map("withdrawals")
+}
+
+model Notice {
+  id         String   @id @default(uuid())
+  category   String
+  title      String
+  content    String   @db.Text
+  image_url  String?
+  is_new     Boolean  @default(false)
+  is_pinned  Boolean  @default(false)
+  author_id  String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  author User @relation(fields: [author_id], references: [id])
+
+  @@map("notices")
+}
+
+model UserCoupon {
+  id            String   @id @default(uuid())
+  user_id       String
+  coupon_id     String
+  registered_at DateTime @default(now())
+
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  coupon Coupon @relation(fields: [coupon_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, coupon_id])
+  @@map("user_coupons")
+}
+
+model Coupon {
+  id             String      @id @default(uuid())
+  code           String      @unique
+  type           CouponType
+  discount_value Int
+  scope          CouponScope
+  seller_id      String?
+  program_id     String?
+  min_price      Int         @default(0)
+  max_discount   Int?
+  usage_limit    Int?
+  per_user_limit Int         @default(1)
+  used_count     Int         @default(0)
+  is_active      Boolean     @default(true)
+  expires_at     DateTime?
+  created_by     String
+  description    String?
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+
+  creator      User          @relation("CouponCreator", fields: [created_by], references: [id])
+  program      Program?      @relation(fields: [program_id], references: [id])
+  usages       CouponUsage[]
+  user_coupons UserCoupon[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  coupon_id String
+  user_id   String
+  order_id  String   @unique
+  discount  Int
+  used_at   DateTime @default(now())
+
+  coupon Coupon @relation(fields: [coupon_id], references: [id])
+  user   User   @relation(fields: [user_id], references: [id])
+  order  Order  @relation(fields: [order_id], references: [id])
+
+  @@map("coupon_usages")
+}
+
+model Wishlist {
+  id         String   @id @default(uuid())
+  user_id    String
+  program_id String
+  created_at DateTime @default(now())
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, program_id])
+  @@map("wishlists")
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  user_id    String
+  program_id String
+  created_at DateTime @default(now())
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, program_id])
+  @@map("cart_items")
+}
+
+model Inquiry {
+  id          String        @id @default(uuid())
+  user_id     String
+  program_id  String?
+  target_type InquiryTarget
+  title       String
+  content     String        @db.Text
+  status      InquiryStatus @default(open)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  user    User          @relation(fields: [user_id], references: [id])
+  program Program?      @relation(fields: [program_id], references: [id])
+  replies InquiryReply[]
+
+  @@map("inquiries")
+}
+
+model InquiryReply {
+  id         String   @id @default(uuid())
+  inquiry_id String
+  author_id  String
+  content    String   @db.Text
+  created_at DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiry_id], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [author_id], references: [id])
+
+  @@map("inquiry_replies")
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  user_id    String
+  type       NotificationType
+  title      String
+  body       String
+  link       String?
+  is_read    Boolean          @default(false)
+  created_at DateTime         @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  reporter_id String
+  program_id  String
+  reason      ReportReason
+  detail      String?      @db.Text
+  status      ReportStatus @default(pending)
+  admin_note  String?
+  reviewer_id String?
+  created_at  DateTime     @default(now())
+  reviewed_at DateTime?
+
+  reporter User    @relation("ReportReporter", fields: [reporter_id], references: [id])
+  reviewer User?   @relation("ReportReviewer", fields: [reviewer_id], references: [id])
+  program  Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model GiftCardUsage {
+  id       String   @id @default(uuid())
+  pin      String   @unique
+  user_id  String
+  amount   Int
+  provider String
+  used_at  DateTime @default(now())
+
+  @@map("gift_card_usages")
+}
+
+enum ProductType {
+  file_product
+  class
+}
+
+enum PointTransactionType {
+  charge_card
+  charge_gift_card
+  charge_admin
+  purchase
+  refund
+}
+
 enum UserRole {
   buyer
   seller
+  manager
   admin
 }
 
@@ -216,4 +464,55 @@ enum SettlementStatus {
   scheduled
   completed
   held
+}
+
+enum WithdrawalStatus {
+  pending
+  processing
+  completed
+  rejected
+}
+
+enum CouponType {
+  percentage
+  fixed
+}
+
+enum ReportReason {
+  inappropriate_content
+  spam
+  copyright
+  fake
+  other
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  dismissed
+}
+
+enum CouponScope {
+  global
+  seller
+  program
+}
+
+enum InquiryTarget {
+  seller
+  admin
+}
+
+enum InquiryStatus {
+  open
+  answered
+  closed
+}
+
+enum NotificationType {
+  order_paid
+  order_confirmed
+  order_refunded
+  withdrawal_processed
+  inquiry_answered
 }

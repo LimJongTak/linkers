@@ -1,5 +1,5 @@
 // src/app/api/auth/kakao/callback/route.ts
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 import { db } from '@/lib/db'
 import { issueTokens, handleError } from '@/lib/auth'
@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
       new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: process.env.KAKAO_CLIENT_ID!,
+        client_secret: process.env.KAKAO_CLIENT_SECRET!,
         redirect_uri: process.env.KAKAO_REDIRECT_URI!,
         code,
       }),
@@ -51,16 +52,23 @@ export async function GET(req: NextRequest) {
       role: user.role as any,
     })
 
-    // Refresh Token → HttpOnly 쿠키
-    const redirectUrl = new URL('/my', process.env.NEXT_PUBLIC_API_BASE!)
-    const response = Response.redirect(redirectUrl, 302)
-    response.headers.append(
-      'Set-Cookie',
-      `refresh_token=${refreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/api/auth; Max-Age=${7 * 24 * 3600}`
-    )
-    // Access Token은 쿼리스트링으로 전달 (클라이언트가 메모리에 저장)
+    // Access Token은 쿼리스트링으로 전달, /login에서 처리 후 /my로 이동
+    const redirectUrl = new URL('/login', process.env.NEXT_PUBLIC_API_BASE!)
     redirectUrl.searchParams.set('at', accessToken)
-    return Response.redirect(redirectUrl, 302)
+    redirectUrl.searchParams.set('uid', user.id)
+    redirectUrl.searchParams.set('nick', user.nickname)
+    redirectUrl.searchParams.set('role', user.role)
+
+    const response = NextResponse.redirect(redirectUrl)
+    // Refresh Token → HttpOnly 쿠키
+    response.cookies.set('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/api/auth',
+      maxAge: 7 * 24 * 3600,
+    })
+    return response
   } catch (err) {
     return handleError(err)
   }

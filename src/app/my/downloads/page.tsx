@@ -6,29 +6,82 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { useAuth } from '@/store/auth'
 
-const DEMO_FILES = [
-  { id: 'f1', programTitle: '마음을 잇는 레크리에이션', fileName: '레크리에이션_진행가이드.pdf', size: '3.2MB', type: 'pdf', remaining: 4, icon: '🎯' },
-  { id: 'f2', programTitle: '마음을 잇는 레크리에이션', fileName: '활동자료_인쇄용.pptx', size: '8.7MB', type: 'pptx', remaining: 5, icon: '🎯' },
-  { id: 'f3', programTitle: '수학으로 만나는 AI 세계', fileName: 'AI수업_학생워크북.pdf', size: '2.1MB', type: 'pdf', remaining: 3, icon: '🧮' },
-]
+interface DownloadFile {
+  permissionId: string
+  fileId: string
+  fileName: string
+  fileType: string
+  fileSize: string
+  programTitle: string
+  programId: string
+  downloadCount: number
+  maxDownloads: number
+  remaining: number
+}
+
+const TYPE_ICON: Record<string, string> = { pdf: '📄', pptx: '📊', docx: '📝', xlsx: '📈', hwp: '📋' }
+
+function formatSize(bytes: string) {
+  const n = Number(bytes)
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}MB`
+  if (n >= 1024) return `${(n / 1024).toFixed(0)}KB`
+  return `${n}B`
+}
 
 export default function MyDownloadsPage() {
-  const { user } = useAuth()
+  const { user, accessToken } = useAuth()
   const router = useRouter()
+  const [files, setFiles] = useState<DownloadFile[]>([])
+  const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState<string | null>(null)
 
   useEffect(() => { if (!user) router.replace('/login') }, [user, router])
+
+  useEffect(() => {
+    if (!accessToken) return
+    fetch('/api/downloads', { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(r => r.json())
+      .then(d => setFiles(d.files ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [accessToken])
+
   if (!user) return null
 
-  const handleDownload = (id: string, name: string) => {
-    setDownloading(id)
-    setTimeout(() => {
-      setDownloading(null)
-      alert(`"${name}" 다운로드가 시작됩니다.\n(실제 환경에서는 S3 Presigned URL로 연결됩니다)`)
-    }, 1200)
-  }
+  const handleDownload = async (fileId: string, fileName: string) => {
+    if (downloading) return
+    setDownloading(fileId)
+    try {
+      const res = await fetch(`/api/downloads/${fileId}/url`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error ?? '다운로드 실패')
+        return
+      }
+      // 새 탭으로 S3 presigned URL 열기
+      const a = document.createElement('a')
+      a.href = data.signedUrl
+      a.download = fileName
+      a.target = '_blank'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
 
-  const TYPE_ICON: Record<string, string> = { pdf: '📄', pptx: '📊', docx: '📝', xlsx: '📈' }
+      // 남은 횟수 업데이트
+      setFiles(prev => prev.map(f =>
+        f.fileId === fileId
+          ? { ...f, remaining: data.remainingDownloads, downloadCount: f.downloadCount + 1 }
+          : f
+      ))
+    } catch {
+      alert('네트워크 오류가 발생했습니다')
+    } finally {
+      setDownloading(null)
+    }
+  }
 
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
@@ -48,33 +101,45 @@ export default function MyDownloadsPage() {
         </div>
         <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 24 }}>파일당 최대 5회 다운로드 가능 · 15분 유효 링크 발급</p>
 
-        {DEMO_FILES.map(f => (
-          <div key={f.id} className="file-row" style={{ background: '#fff', borderRadius: 18, padding: '18px 20px', border: '1px solid #F0EDE8', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="file-icon" style={{ width: 44, height: 44, borderRadius: 12, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{TYPE_ICON[f.type] ?? '📁'}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.fileName}</div>
-              <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{f.programTitle} · {f.size}</div>
-            </div>
-            <div style={{ textAlign: 'center', marginRight: 4, flexShrink: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: f.remaining <= 1 ? '#EF4444' : '#374151' }}>{f.remaining}/5</div>
-              <div style={{ fontSize: 10, color: '#9CA3AF' }}>남은 횟수</div>
-            </div>
-            <button
-              onClick={() => handleDownload(f.id, f.fileName)}
-              disabled={downloading !== null || f.remaining === 0}
-              className="dl-btn"
-              style={{ background: f.remaining === 0 ? '#F3F4F6' : '#111827', color: f.remaining === 0 ? '#9CA3AF' : '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, fontWeight: 800, cursor: f.remaining === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-              {downloading === f.id ? '⏳' : f.remaining === 0 ? '소진' : '⬇ 다운'}
-            </button>
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#9CA3AF' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+            <div>불러오는 중...</div>
           </div>
-        ))}
+        )}
 
-        {DEMO_FILES.length === 0 && (
+        {!loading && files.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#9CA3AF' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>📂</div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>다운로드 가능한 파일이 없습니다</div>
+            <Link href="/" style={{ display: 'inline-block', marginTop: 16, background: '#111827', color: '#fff', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+              프로그램 둘러보기
+            </Link>
           </div>
         )}
+
+        {files.map(f => (
+          <div key={f.fileId} className="file-row" style={{ background: '#fff', borderRadius: 18, padding: '18px 20px', border: '1px solid #F0EDE8', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div className="file-icon" style={{ width: 44, height: 44, borderRadius: 12, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+              {TYPE_ICON[f.fileType?.toLowerCase()] ?? '📁'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.fileName}</div>
+              <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{f.programTitle} · {formatSize(f.fileSize)}</div>
+            </div>
+            <div style={{ textAlign: 'center', marginRight: 4, flexShrink: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: f.remaining <= 1 ? '#EF4444' : '#374151' }}>{f.remaining}/{f.maxDownloads}</div>
+              <div style={{ fontSize: 10, color: '#9CA3AF' }}>남은 횟수</div>
+            </div>
+            <button
+              onClick={() => handleDownload(f.fileId, f.fileName)}
+              disabled={downloading !== null || f.remaining === 0}
+              className="dl-btn"
+              style={{ background: f.remaining === 0 ? '#F3F4F6' : '#111827', color: f.remaining === 0 ? '#9CA3AF' : '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, fontWeight: 800, cursor: f.remaining === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              {downloading === f.fileId ? '⏳' : f.remaining === 0 ? '소진' : '⬇ 다운'}
+            </button>
+          </div>
+        ))}
       </main>
     </div>
   )

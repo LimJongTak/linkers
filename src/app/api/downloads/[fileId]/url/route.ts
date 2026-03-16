@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { getDownloadPresignedUrl } from '@/lib/s3'
 import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
 
 export async function POST(
@@ -27,11 +26,21 @@ export async function POST(
       throw new ApiError(403, '다운로드 횟수를 초과했습니다')
     }
 
-    // 2. Presigned URL 생성 (15분)
-    const signedUrl = await getDownloadPresignedUrl(
-      permission.program_file.s3_key,
-      permission.program_file.file_name
-    )
+    const s3Key = permission.program_file.s3_key
+
+    // 2. 다운로드 URL 생성
+    let signedUrl: string
+
+    if (s3Key.startsWith('_local_:')) {
+      // 로컬 파일시스템에 저장된 경우 직접 URL 반환
+      const localPath = s3Key.replace('_local_:', '')
+      const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3000'
+      signedUrl = `${base}/${localPath}`
+    } else {
+      // S3 presigned URL 생성 (15분)
+      const { getDownloadPresignedUrl } = await import('@/lib/s3')
+      signedUrl = await getDownloadPresignedUrl(s3Key, permission.program_file.file_name)
+    }
 
     // 3. 카운트 증가 + 로그
     await db.$transaction([
@@ -56,8 +65,7 @@ export async function POST(
     return Response.json({
       signedUrl,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
-      remainingDownloads:
-        (permission.max_downloads ?? 5) - permission.download_count - 1,
+      remainingDownloads: (permission.max_downloads ?? 5) - permission.download_count - 1,
     })
   } catch (err) {
     return handleError(err)

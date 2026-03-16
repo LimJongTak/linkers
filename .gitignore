@@ -35,6 +35,9 @@ coverage/
 *.pem
 Thumbs.db
 
+# local uploads (S3 미설정 시 로컬 저장)
+public/uploads/
+
 # prisma
 prisma/migrations/*.sql.bak
 

@@ -11,11 +11,11 @@ export async function POST(req: NextRequest) {
     if (rating < 1 || rating > 5) throw new ApiError(400, '별점은 1~5 사이여야 합니다')
     if (content.length < 10) throw new ApiError(400, '리뷰는 최소 10자 이상이어야 합니다')
 
-    // 실구매자 검증
+    // 실구매자 검증 (결제완료 또는 진행완료 상태)
     const order = await db.order.findFirst({
-      where: { id: orderId, buyer_id: user.userId, status: 'confirmed' },
+      where: { id: orderId, buyer_id: user.userId, status: { in: ['paid', 'confirmed'] } },
     })
-    if (!order) throw new ApiError(403, '구매 확정 후 리뷰 작성이 가능합니다')
+    if (!order) throw new ApiError(403, '결제 완료 후 리뷰 작성이 가능합니다')
 
     // 중복 리뷰 방지
     const existing = await db.review.findUnique({ where: { order_id: orderId } })

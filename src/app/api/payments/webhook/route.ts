@@ -55,16 +55,30 @@ export async function POST(req: NextRequest) {
 
       case 'Transaction.Cancelled': {
         const imp_uid = webhook.data.paymentId
-        await db.order.updateMany({
-          where: { payment: { imp_uid } },
-          data: { status: 'refunded' },
+        const pmt = await db.payment.findUnique({
+          where: { imp_uid },
+          include: { order: { select: { id: true, buyer_id: true, point_amount: true } } },
         })
-        const pmt = await db.payment.findUnique({ where: { imp_uid } })
         if (pmt) {
-          await db.downloadPermission.updateMany({
-            where: { order_id: pmt.order_id },
-            data: { is_revoked: true },
-          })
+          await db.order.update({ where: { id: pmt.order_id }, data: { status: 'refunded' } })
+          await db.downloadPermission.updateMany({ where: { order_id: pmt.order_id }, data: { is_revoked: true } })
+          // 포인트 차감분 환불
+          if (pmt.order.point_amount > 0) {
+            await db.user.update({
+              where: { id: pmt.order.buyer_id },
+              data: {
+                points: { increment: pmt.order.point_amount },
+                point_transactions: {
+                  create: {
+                    amount: pmt.order.point_amount,
+                    type: 'refund',
+                    description: '결제 취소 포인트 환불',
+                    reference_id: pmt.order_id,
+                  },
+                },
+              },
+            })
+          }
         }
         break
       }

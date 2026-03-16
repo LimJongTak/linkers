@@ -10,7 +10,7 @@ export async function PUT(
   try {
     const { id } = await params
     const user = verifyAccessToken(req)
-    requireRole(user, 'admin')
+    requireRole(user, 'admin', 'manager')
 
     const program = await db.program.update({
       where: { id },
@@ -39,7 +39,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const user = verifyAccessToken(req)
-    requireRole(user, 'admin')
+    requireRole(user, 'admin', 'manager')
 
     const body = await req.json().catch(() => ({}))
     const reason = body.reason ?? '관리자 반려'
