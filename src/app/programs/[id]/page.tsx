@@ -40,7 +40,7 @@ export default function ProgramDetailPage() {
   const [tab, setTab]           = useState<'intro' | 'files' | 'reviews'>('intro')
   const [showModal, setShowModal] = useState(false)
   const [payStep, setPayStep]   = useState<'form' | 'paying' | 'done'>('form')
-  const [payMethod, setPayMethod] = useState('kakao')
+  const [payMethod, setPayMethod] = useState('point')
   const [date, setDate]         = useState('')
   const [msg, setMsg]           = useState('')
   const [userPoints, setUserPoints] = useState<number | null>(null)
@@ -486,12 +486,10 @@ export default function ProgramDetailPage() {
               <button onClick={handleBuy} style={{ width: '100%', background: isFile ? '#0369A1' : '#111827', color: '#fff', border: 'none', borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8 }}>
                 {isFile ? '📥 파일 구매하기 →' : '📅 강의 신청하기 →'}
               </button>
-              {isFile && (
-                <button onClick={handleAddToCart}
-                  style={{ width: '100%', background: cartAdded ? '#D1FAE5' : '#fff', color: cartAdded ? '#065F46' : '#374151', border: `2px solid ${cartAdded ? '#6EE7B7' : '#E5E7EB'}`, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.2s' }}>
-                  {cartAdded ? '✓ 장바구니 담김!' : '🛒 장바구니 담기'}
-                </button>
-              )}
+              <button onClick={handleAddToCart}
+                style={{ width: '100%', background: cartAdded ? '#D1FAE5' : '#fff', color: cartAdded ? '#065F46' : '#374151', border: `2px solid ${cartAdded ? '#6EE7B7' : '#E5E7EB'}`, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.2s' }}>
+                {cartAdded ? '✓ 장바구니 담김!' : '🛒 장바구니 담기'}
+              </button>
               {inquiryDone && (
                 <div style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 10, padding: '10px 14px', fontSize: 12, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
                   ✓ 문의가 접수되었습니다
@@ -606,7 +604,7 @@ export default function ProgramDetailPage() {
                 )}
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>결제 수단</div>
-                  {[['kakao', '💛 카카오페이', false], ['card', '💳 신용카드', false], ['toss', '💙 토스페이', false], ['point', '💰 포인트 결제', true]].map(([v, l, isPoint]) => {
+                  {[['point', '💰 포인트 결제', true]].map(([v, l, isPoint]) => {
                     const tooFew = isPoint && notEnough
                     return (
                       <div key={v as string} className={`pay-method ${payMethod === v ? 'on' : ''}`}

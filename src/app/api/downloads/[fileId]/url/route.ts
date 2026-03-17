@@ -36,6 +36,11 @@ export async function POST(
       const localPath = s3Key.replace('_local_:', '')
       const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3000'
       signedUrl = `${base}/${localPath}`
+    } else if (s3Key.startsWith('_supabase_:')) {
+      // Supabase Storage signed URL 생성 (1시간)
+      const storagePath = s3Key.replace('_supabase_:', '')
+      const { getSupabaseSignedUrl } = await import('@/lib/supabase-storage')
+      signedUrl = await getSupabaseSignedUrl(storagePath)
     } else {
       // S3 presigned URL 생성 (15분)
       const { getDownloadPresignedUrl } = await import('@/lib/s3')

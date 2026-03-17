@@ -163,7 +163,7 @@ export default function CartPage() {
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginBottom: 16 }}>결제 정보</div>
 
                 <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 12 }}>결제 수단</div>
-                {[['point', '💰 포인트'], ['card', '💳 카드 (자동승인)']].map(([v, l]) => (
+                {[['point', '💰 포인트']].map(([v, l]) => (
                   <div key={v} onClick={() => setPayMethod(v)}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, border: `2px solid ${payMethod === v ? '#111827' : '#E5E7EB'}`, marginBottom: 8, cursor: 'pointer', background: payMethod === v ? '#F9FAFB' : '#fff', transition: 'all 0.15s' }}>
                     <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${payMethod === v ? '#111827' : '#D1D5DB'}`, background: payMethod === v ? '#111827' : 'transparent', flexShrink: 0 }} />

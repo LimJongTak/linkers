@@ -2,9 +2,8 @@ import { NextRequest } from 'next/server'
 import { verifyAccessToken, handleError, ApiError } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { grantDownloadPermissions } from '@/lib/permissions'
-import fs from 'fs/promises'
-import path from 'path'
 import { v4 as uuid } from 'uuid'
+import { hasSupabaseStorage, uploadToSupabase } from '@/lib/supabase-storage'
 
 // S3 자격증명이 모두 설정된 경우에만 S3 사용
 function hasS3() {
@@ -48,15 +47,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const { uploadFile } = await import('@/lib/s3')
         const result = await uploadFile(buffer, fileName, fileType, id)
         s3Key = result.s3Key
-      } else {
+      } else if (hasSupabaseStorage()) {
+        // Supabase Storage 사용
+        const ext = fileName.split('.').pop() || 'bin'
+        const savedName = `${uuid()}.${ext}`
+        const storagePath = `${id}/${savedName}`
+        await uploadToSupabase(buffer, storagePath, fileType)
+        s3Key = `_supabase_:${storagePath}`
+      } else if (process.env.NODE_ENV !== 'production') {
         // 로컬 파일시스템에 저장 (개발 환경 fallback)
+        const fs = await import('fs/promises')
+        const path = await import('path')
         const ext = fileName.split('.').pop() || 'bin'
         const savedName = `${uuid()}.${ext}`
         const uploadDir = path.join(process.cwd(), 'public', 'uploads', id)
         await fs.mkdir(uploadDir, { recursive: true })
         await fs.writeFile(path.join(uploadDir, savedName), buffer)
-        // s3_key를 _local_: 접두사로 표시
         s3Key = `_local_:uploads/${id}/${savedName}`
+      } else {
+        throw new ApiError(500, '파일 스토리지가 설정되지 않았습니다. SUPABASE_URL과 SUPABASE_SERVICE_KEY를 설정해주세요.')
       }
     } else {
       // JSON 방식 (외부에서 S3 presigned URL 업로드 후 메타 등록)

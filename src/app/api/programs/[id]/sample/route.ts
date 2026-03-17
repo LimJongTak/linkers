@@ -26,6 +26,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return Response.redirect(new URL(publicPath, _req.url))
     }
 
+    // Supabase Storage → signed URL 생성
+    if (s3Key.startsWith('_supabase_:')) {
+      const storagePath = s3Key.replace('_supabase_:', '')
+      const { getSupabaseSignedUrl } = await import('@/lib/supabase-storage')
+      const signedUrl = await getSupabaseSignedUrl(storagePath)
+      return Response.redirect(signedUrl)
+    }
+
     // S3 → presigned URL 생성
     const { getDownloadPresignedUrl } = await import('@/lib/s3')
     const signedUrl = await getDownloadPresignedUrl(s3Key, previewFile.file_name)
