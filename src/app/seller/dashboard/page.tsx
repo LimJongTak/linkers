@@ -86,8 +86,15 @@ function SaleForm({
   onCancel: () => void
 }) {
   const [salePrice, setSalePrice] = useState(program.salePrice ? String(program.salePrice) : '')
-  const [saleStartAt, setSaleStartAt] = useState(program.saleStartAt ? program.saleStartAt.slice(0, 16) : '')
-  const [saleEndAt, setSaleEndAt] = useState(program.saleEndAt ? program.saleEndAt.slice(0, 16) : '')
+  // UTC ISO → 로컬 datetime-local 형식으로 변환
+  const toLocalInput = (iso: string | null | undefined) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  const [saleStartAt, setSaleStartAt] = useState(toLocalInput(program.saleStartAt))
+  const [saleEndAt, setSaleEndAt] = useState(toLocalInput(program.saleEndAt))
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -234,18 +241,25 @@ export default function SellerDashboardPage() {
   }
 
   const handleSetSale = async (programId: string, salePrice: string, saleStartAt: string, saleEndAt: string) => {
+    // datetime-local 값(로컬 시간)을 UTC ISO로 변환 (타임존 버그 방지)
+    const toUtcIso = (local: string) => local ? new Date(local).toISOString() : null
     const res = await fetch(`/api/seller/programs/${programId}`, {
       method: 'PATCH',
       headers: authHeaders(),
-      body: JSON.stringify({ action: 'set_sale', salePrice, saleStartAt: saleStartAt || null, saleEndAt: saleEndAt || null }),
+      body: JSON.stringify({
+        action: 'set_sale',
+        salePrice,
+        saleStartAt: toUtcIso(saleStartAt),
+        saleEndAt: toUtcIso(saleEndAt),
+      }),
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
       throw new Error(d.detail ?? d.error ?? d.message ?? '세일 저장 실패')
     }
-    // 성공한 경우에만 폼 닫기
-    setSaleFormOpen(null)
+    // 데이터 갱신 먼저, 그 다음 폼 닫기 (갱신 실패 시 폼에서 에러 표시)
     await refreshPrograms()
+    setSaleFormOpen(null)
   }
 
   const handleEndSale = async (programId: string) => {
@@ -258,8 +272,8 @@ export default function SellerDashboardPage() {
       const d = await res.json().catch(() => ({}))
       throw new Error(d.detail ?? d.error ?? d.message ?? '세일 종료 실패')
     }
-    setSaleFormOpen(null)
     await refreshPrograms()
+    setSaleFormOpen(null)
   }
 
   useEffect(() => {

@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
           saleEndAt: p.sale_end_at,
           isSaleActive,
           status: p.status,
-          ratingAvg: p.rating_avg,
+          ratingAvg: parseFloat(String(p.rating_avg)) || 0,
           reviewCount: p.review_count,
           orderCount: p._count.orders,
           revenue,
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
         monthOrders: monthOrders.length,
         totalRevenue,
         monthRevenue,
-        avgRating: reviewStats._avg.rating ?? 0,
+        avgRating: parseFloat(String(reviewStats._avg.rating ?? 0)) || 0,
         totalReviews: reviewStats._count.id,
       },
     })
