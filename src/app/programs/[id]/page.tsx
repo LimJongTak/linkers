@@ -27,6 +27,7 @@ interface DBProgram {
   rating_avg: string
   review_count: number
   tags: string[]
+  thumbnail_url: string | null
   seller: { id: string; nickname: string; profile_image: string | null }
   files: { id: string; file_name: string; file_type: string; file_size: string; is_preview: boolean }[]
 }
@@ -265,9 +266,11 @@ export default function ProgramDetailPage() {
         <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32, alignItems: 'start' }}>
           {/* 왼쪽 */}
           <div>
-            <div style={{ height: 200, background: `linear-gradient(135deg,${catGrad(p.category)})`, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80, marginBottom: 24, position: 'relative' }}>
-              {catIcon(p.category)}
-              <span style={{ position: 'absolute', top: 16, left: 16, background: isFile ? '#0369A1' : '#5B21B6', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 8 }}>
+            <div style={{ height: 260, borderRadius: 20, marginBottom: 24, position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg,${catGrad(p.category)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80 }}>
+              {p.thumbnail_url
+                ? <img src={p.thumbnail_url} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
+                : catIcon(p.category)}
+              <span style={{ position: 'absolute', top: 16, left: 16, background: isFile ? '#0369A1' : '#5B21B6', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 8, zIndex: 1 }}>
                 {isFile ? '📄 파일 자료' : '🎓 강의'}
               </span>
               <span style={{ position: 'absolute', top: 16, right: 16, background: '#111827', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6 }}>{p.category}</span>
