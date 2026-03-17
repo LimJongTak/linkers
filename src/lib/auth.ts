@@ -63,6 +63,6 @@ export function handleError(err: unknown) {
   const message = err instanceof Error ? err.message : String(err)
   console.error('[API Error]', err)
   // dev 환경에서는 실제 에러 메시지 노출
-  const detail = process.env.NODE_ENV !== 'production' ? message : undefined
+  const detail = message
   return Response.json({ error: 'Internal Server Error', detail }, { status: 500 })
 }
