@@ -111,7 +111,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const admin = verifyAccessToken(req)
     requireRole(admin, 'admin')
     const { id } = await params
-    const { secret } = await req.json()
+    const { secret, hardDelete } = await req.json()
 
     if (!secret || secret !== process.env.ADMIN_INIT_SECRET) {
       throw new ApiError(403, '관리자 시크릿 키가 올바르지 않습니다')
@@ -121,7 +121,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const target = await db.user.findUnique({ where: { id } })
     if (!target) throw new ApiError(404, '사용자를 찾을 수 없습니다')
 
-    // 개인정보 익명화 (기록 보존, PII 삭제)
+    if (hardDelete) {
+      // 완전 삭제: 탈퇴 회원(익명화된) DB 레코드 영구 삭제
+      if (target.oauth_provider !== 'deleted') {
+        throw new ApiError(400, '탈퇴 처리된 회원만 완전 삭제할 수 있습니다')
+      }
+      await db.user.delete({ where: { id } })
+      return Response.json({ success: true, deleted: true })
+    }
+
+    // 일반 탈퇴: 개인정보 익명화 (기록 보존, PII 삭제)
     await db.user.update({
       where: { id },
       data: {

@@ -176,11 +176,14 @@ function DashTab({ token, onTabChange }: { token: string | null; onTabChange: (t
 function UsersTab({ token }: { token: string | null }) {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [showWithdrawn, setShowWithdrawn] = useState(false)
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const { show, Toast } = useToast()
-  const url = `/api/admin/users?page=${page}&search=${query}&role=${roleFilter}`
-  const { data, loading, reload } = useAdminFetch<any>(url, token, [page, query, roleFilter])
+  const url = showWithdrawn
+    ? `/api/admin/users?page=${page}&withdrawn=1`
+    : `/api/admin/users?page=${page}&search=${query}&role=${roleFilter}`
+  const { data, loading, reload } = useAdminFetch<any>(url, token, [page, query, roleFilter, showWithdrawn])
   const [modal, setModal] = useState<{ userId: string; nickname: string; currentPoints?: number; action: 'grant_points' | 'deduct_points' | 'change_role' | 'update_profile'; email?: string; phone?: string } | null>(null)
   const [modalVal, setModalVal] = useState('')
   const [modalReason, setModalReason] = useState('')
@@ -194,6 +197,11 @@ function UsersTab({ token }: { token: string | null }) {
   const [withdrawSecret, setWithdrawSecret] = useState('')
   const [withdrawLoading, setWithdrawLoading] = useState(false)
   const [withdrawError, setWithdrawError] = useState('')
+
+  const [hardDeleteModal, setHardDeleteModal] = useState<{ userId: string } | null>(null)
+  const [hardDeleteSecret, setHardDeleteSecret] = useState('')
+  const [hardDeleteLoading, setHardDeleteLoading] = useState(false)
+  const [hardDeleteError, setHardDeleteError] = useState('')
 
   const callAction = async (userId: string, body: object) => {
     setModalLoading(true); setModalError('')
@@ -228,6 +236,23 @@ function UsersTab({ token }: { token: string | null }) {
     } finally { setWithdrawLoading(false) }
   }
 
+  const handleHardDelete = async () => {
+    if (!hardDeleteModal) return
+    setHardDeleteLoading(true); setHardDeleteError('')
+    try {
+      const res = await fetch(`/api/admin/users/${hardDeleteModal.userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ secret: hardDeleteSecret, hardDelete: true }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setHardDeleteError(d.error ?? '오류 발생'); return }
+      setHardDeleteModal(null); setHardDeleteSecret('')
+      show('완전 삭제 완료')
+      reload()
+    } finally { setHardDeleteLoading(false) }
+  }
+
   const isPointsAction = modal?.action === 'grant_points' || modal?.action === 'deduct_points'
   const isProfileAction = modal?.action === 'update_profile'
 
@@ -241,19 +266,31 @@ function UsersTab({ token }: { token: string | null }) {
           {roleFilter && <span style={{ marginLeft: 8, color: '#9CA3AF' }}>· 필터 결과 {data.total.toLocaleString()}명</span>}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && (setPage(1), setQuery(search))}
-          placeholder="닉네임 / 이메일 검색" style={{ flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit', outline: 'none' }} />
-        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1) }}
-          style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit', background: '#fff', outline: 'none' }}>
-          <option value="">전체 역할</option>
-          <option value="buyer">구매·판매자 (buyer)</option>
-          <option value="seller">구매·판매자 (seller)</option>
-          <option value="manager">매니저</option>
-          <option value="admin">관리자</option>
-        </select>
-        <button onClick={() => { setPage(1); setQuery(search) }} style={{ padding: '10px 20px', background: '#111827', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>검색</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button onClick={() => { setShowWithdrawn(false); setPage(1) }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', background: !showWithdrawn ? '#111827' : '#F3F4F6', color: !showWithdrawn ? '#fff' : '#6B7280' }}>
+          일반 회원
+        </button>
+        <button onClick={() => { setShowWithdrawn(true); setPage(1) }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', background: showWithdrawn ? '#DC2626' : '#F3F4F6', color: showWithdrawn ? '#fff' : '#6B7280' }}>
+          탈퇴 회원
+        </button>
       </div>
+      {!showWithdrawn && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && (setPage(1), setQuery(search))}
+            placeholder="닉네임 / 이메일 검색" style={{ flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit', outline: 'none' }} />
+          <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1) }}
+            style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit', background: '#fff', outline: 'none' }}>
+            <option value="">전체 역할</option>
+            <option value="buyer">구매·판매자 (buyer)</option>
+            <option value="seller">구매·판매자 (seller)</option>
+            <option value="manager">매니저</option>
+            <option value="admin">관리자</option>
+          </select>
+          <button onClick={() => { setPage(1); setQuery(search) }} style={{ padding: '10px 20px', background: '#111827', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>검색</button>
+        </div>
+      )}
       <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0EDE8', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
@@ -278,6 +315,12 @@ function UsersTab({ token }: { token: string | null }) {
                     <td style={{ padding: '12px 14px', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{new Date(u.created_at).toLocaleDateString('ko-KR')}</td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {u.oauth_provider === 'deleted' ? (
+                          <button onClick={() => { setHardDeleteModal({ userId: u.id }); setHardDeleteSecret(''); setHardDeleteError('') }}
+                            style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#7F1D1D', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                            🗑 완전 삭제
+                          </button>
+                        ) : (<>
                         <button onClick={() => { setModal({ userId: u.id, nickname: u.nickname, currentPoints: u.points, action: 'grant_points' }); setModalVal('') }}
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#EDE9FE', color: '#5B21B6', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>P 지급</button>
                         <button onClick={() => { setModal({ userId: u.id, nickname: u.nickname, currentPoints: u.points, action: 'deduct_points' }); setModalVal('') }}
@@ -288,6 +331,7 @@ function UsersTab({ token }: { token: string | null }) {
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#F0FDF4', color: '#15803D', cursor: 'pointer', fontFamily: 'inherit' }}>프로필</button>
                         <button onClick={() => { setWithdrawModal({ userId: u.id, nickname: u.nickname }); setWithdrawSecret(''); setWithdrawError('') }}
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer', fontFamily: 'inherit' }}>탈퇴</button>
+                        </>)}
                       </div>
                     </td>
                   </tr>
@@ -371,6 +415,46 @@ function UsersTab({ token }: { token: string | null }) {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 완전 삭제 모달 */}
+      {hardDeleteModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => e.target === e.currentTarget && setHardDeleteModal(null)}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 400 }}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: '#7F1D1D', marginBottom: 6 }}>🗑 탈퇴 회원 완전 삭제</div>
+            <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 6, lineHeight: 1.6 }}>
+              이 회원의 DB 레코드를 <strong style={{ color: '#DC2626' }}>영구적으로 삭제</strong>합니다.<br />
+              연결된 주문·리뷰·포인트 내역도 모두 삭제되며 복구할 수 없습니다.
+            </div>
+            <div style={{ background: '#FEF2F2', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#991B1B', fontWeight: 700, marginBottom: 16 }}>
+              ⚠️ 탈퇴 처리된 회원만 완전 삭제할 수 있습니다
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>ADMIN_INIT_SECRET 키 입력</label>
+              <input
+                type="password"
+                value={hardDeleteSecret}
+                onChange={e => setHardDeleteSecret(e.target.value)}
+                placeholder="관리자 시크릿 키"
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #FCA5A5', fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
+            {hardDeleteError && (
+              <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>✕ {hardDeleteError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setHardDeleteModal(null)}
+                style={{ flex: 1, padding: '12px', background: '#F9FAFB', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}>
+                취소
+              </button>
+              <button onClick={handleHardDelete} disabled={hardDeleteLoading || !hardDeleteSecret}
+                style={{ flex: 1, padding: '12px', background: hardDeleteSecret ? '#7F1D1D' : '#E5E7EB', color: hardDeleteSecret ? '#fff' : '#9CA3AF', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: hardDeleteSecret ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: hardDeleteLoading ? 0.7 : 1 }}>
+                {hardDeleteLoading ? '삭제 중...' : '영구 삭제'}
+              </button>
+            </div>
           </div>
         </div>
       )}

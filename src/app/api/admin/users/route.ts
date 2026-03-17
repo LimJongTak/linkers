@@ -13,13 +13,20 @@ export async function GET(req: NextRequest) {
     const page   = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
     const limit  = 20
 
-    const where: any = {}
-    if (role && ['buyer', 'seller', 'manager', 'admin'].includes(role)) where.role = role
-    if (search) {
-      where.OR = [
-        { nickname: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-      ]
+    const withdrawn = searchParams.get('withdrawn') === '1'
+
+    const where: any = withdrawn
+      ? { oauth_provider: 'deleted' }
+      : { NOT: { oauth_provider: 'deleted' } }
+
+    if (!withdrawn) {
+      if (role && ['buyer', 'seller', 'manager', 'admin'].includes(role)) where.role = role
+      if (search) {
+        where.OR = [
+          { nickname: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ]
+      }
     }
 
     const [users, total] = await Promise.all([
