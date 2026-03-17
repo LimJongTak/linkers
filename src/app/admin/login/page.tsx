@@ -8,6 +8,8 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const { login } = useAuth()
   const [secretKey, setSecretKey] = useState('')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -19,7 +21,11 @@ export default function AdminLoginPage() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secretKey }),
+        body: JSON.stringify({
+          secretKey,
+          identifier: identifier.trim() || undefined,
+          password: password || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -27,13 +33,13 @@ export default function AdminLoginPage() {
           INVALID_SECRET_KEY: '시크릿 키가 올바르지 않습니다.',
           NO_ADMIN_ACCOUNT: '관리자 계정이 없습니다. /admin/init 에서 먼저 생성해주세요.',
         }
-        setError(msg[data.error] ?? '오류가 발생했습니다.')
+        setError(msg[data.error] ?? data.detail ?? data.message ?? '오류가 발생했습니다.')
         return
       }
       login(data.accessToken, {
         id: data.admin.id,
         nickname: data.admin.nickname,
-        role: 'admin',
+        role: data.admin.role,
       })
       router.replace('/admin')
     } catch {
@@ -56,7 +62,7 @@ export default function AdminLoginPage() {
           <p style={{ fontSize: 13, color: '#9CA3AF' }}>링커스 운영 콘솔</p>
         </div>
 
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>
             시크릿 키
           </label>
@@ -64,10 +70,36 @@ export default function AdminLoginPage() {
             type="password"
             value={secretKey}
             onChange={e => setSecretKey(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             placeholder="ADMIN_INIT_SECRET 값 입력"
             autoFocus
             style={{ width: '100%', padding: '13px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 15, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>
+            이메일 또는 닉네임 <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(관리자가 여러 명인 경우 필수)</span>
+          </label>
+          <input
+            type="text"
+            value={identifier}
+            onChange={e => setIdentifier(e.target.value)}
+            placeholder="예: admin@linkers.kr 또는 홍길동"
+            style={{ width: '100%', padding: '13px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>
+            비밀번호 <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(이메일 가입 계정인 경우)</span>
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            placeholder="이메일로 가입한 계정의 비밀번호"
+            style={{ width: '100%', padding: '13px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const }}
           />
         </div>
 
