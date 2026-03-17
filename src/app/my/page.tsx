@@ -34,6 +34,7 @@ export default function MyPage() {
     { href: '/my/programs',          icon: '📦', label: '내 프로그램',    desc: '등록한 프로그램 관리' },
     { href: '/my/sales',             icon: '💸', label: '판매 내역 · 수익금', desc: '판매 현황 및 환전 신청' },
     { href: '/seller/programs/new',  icon: '➕', label: '프로그램 등록',  desc: '새 프로그램 등록하기' },
+    ...((user.role === 'buyer' || user.role === 'seller') ? [{ href: '/seller/dashboard', icon: '🏪', label: '판매자 콘솔', desc: '매출·주문·리뷰·쿠폰 관리' }] : []),
     ...((user.role === 'admin' || user.role === 'manager') ? [{ href: '/admin', icon: '⚙️', label: user.role === 'admin' ? '관리자 콘솔' : '매니저 콘솔', desc: '시스템 전체 관리' }] : []),
   ]
 
