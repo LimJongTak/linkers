@@ -131,9 +131,11 @@ function LoginContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
+  // OAuth 콜백 중이면 두 번째 리다이렉트가 덮어쓰지 않도록 방지
   useEffect(() => {
-    if (user) router.replace('/')
-  }, [user, router])
+    const isOAuthCallback = !!searchParams.get('at')
+    if (user && !isOAuthCallback) router.replace('/')
+  }, [user, router, searchParams])
 
   // 카카오 로그인
   const handleKakaoLogin = () => {
