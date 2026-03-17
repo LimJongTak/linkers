@@ -401,8 +401,10 @@ function PCard({ p, purchased, wishlisted, onToggleWishlist }: {
         <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', lineHeight: 1.35, marginBottom: 4 }}>{p.title}</div>
         <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 10 }}>{p.subtitle ?? ''}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid #F3F4F6' }}>
-          <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg,#667EEA,#764BA2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 800, flexShrink: 0 }}>
-            {p.seller.nickname[0]}
+          <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg,#667EEA,#764BA2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 800, flexShrink: 0, overflow: 'hidden' }}>
+            {p.seller.profile_image
+              ? <img src={p.seller.profile_image} alt={p.seller.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+              : p.seller.nickname[0]}
           </div>
           <span style={{ fontSize: 12, color: '#374151', fontWeight: 700 }}>{p.seller.nickname}</span>
         </div>
