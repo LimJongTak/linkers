@@ -413,6 +413,14 @@ model Report {
   @@map("reports")
 }
 
+model AdminSetting {
+  key        String   @id
+  value      String
+  updated_at DateTime @updatedAt
+
+  @@map("admin_settings")
+}
+
 model GiftCardUsage {
   id       String   @id @default(uuid())
   pin      String   @unique
@@ -434,6 +442,7 @@ enum PointTransactionType {
   charge_gift_card
   charge_admin
   purchase
+  purchase_reward
   refund
 }
 

@@ -4,6 +4,7 @@ import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
 import { grantDownloadPermissions } from '@/lib/permissions'
 import { createNotification } from '@/lib/notify'
 import { sendOrderPaidEmail } from '@/lib/email'
+import { awardPurchasePoints } from '@/lib/pointReward'
 
 export async function POST(req: NextRequest) {
   try {
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
       if (buyerUser?.email) {
         sendOrderPaidEmail(buyerUser.email, buyerUser.nickname, program.title, discountedPrice, order.id)
       }
+      awardPurchasePoints(user.userId, discountedPrice, order.order_number)
     }
 
     return Response.json({ order, cardAmount, pointsUsed: pointsToUse }, { status: 201 })

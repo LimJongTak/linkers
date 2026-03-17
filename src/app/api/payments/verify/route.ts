@@ -5,6 +5,7 @@ import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
 import { grantDownloadPermissions } from '@/lib/permissions'
 import { createSettlement } from '@/lib/settlements'
 import { sendPaymentCompleteNotifications } from '@/lib/kakao'
+import { awardPurchasePoints } from '@/lib/pointReward'
 
 const portone = PortOneClient(process.env.PORTONE_API_SECRET!)
 
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
       grantDownloadPermissions(orderId),
       createSettlement(orderId),
       sendPaymentCompleteNotifications(orderId),
+      awardPurchasePoints(user.userId, payment.amount.total, order.order_number),
     ])
 
     return Response.json({ success: true, orderId })

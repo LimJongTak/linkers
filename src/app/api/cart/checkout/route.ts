@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { verifyAccessToken, handleError, ApiError } from '@/lib/auth'
 import { grantDownloadPermissions } from '@/lib/permissions'
 import { createNotification } from '@/lib/notify'
+import { awardPurchasePoints } from '@/lib/pointReward'
 
 export async function POST(req: NextRequest) {
   try {
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
         `장바구니 ${orders.length}개 상품 구매가 완료되었습니다.`,
         '/my/orders'
       )
+      awardPurchasePoints(user.userId, totalPrice, orders[0].id)
     }
 
     // 장바구니 비우기

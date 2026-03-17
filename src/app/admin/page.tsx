@@ -8,7 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend,
 } from 'recharts'
 
-type Tab = 'dash' | 'users' | 'programs' | 'orders' | 'settlements' | 'downloads' | 'withdrawals' | 'coupons' | 'reports'
+type Tab = 'dash' | 'users' | 'programs' | 'orders' | 'settlements' | 'downloads' | 'withdrawals' | 'coupons' | 'reports' | 'settings'
 
 function useAdminFetch<T>(url: string, token: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
@@ -1096,6 +1096,83 @@ function ReportsTab({ token }: { token: string | null }) {
   )
 }
 
+// ── 설정 탭 ──────────────────────────────────────────────────
+function SettingsTab({ token }: { token: string | null }) {
+  const [rate, setRate] = useState('')
+  const [saved, setSaved] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { show, Toast } = useToast()
+
+  useEffect(() => {
+    if (!token) return
+    fetch('/api/admin/settings', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => {
+        const v = d.settings?.point_reward_rate ?? ''
+        setRate(v)
+        setSaved(v)
+      })
+  }, [token])
+
+  const handleSave = async () => {
+    if (!token) return
+    setLoading(true)
+    const res = await fetch('/api/admin/settings', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'point_reward_rate', value: rate }),
+    })
+    setLoading(false)
+    if (res.ok) { setSaved(rate); show('저장되었습니다') }
+    else { const d = await res.json(); show(d.error ?? '저장 실패') }
+  }
+
+  return (
+    <div>
+      {Toast}
+      <h2 style={{ fontSize: 17, fontWeight: 900, color: '#111827', marginBottom: 20 }}>플랫폼 설정</h2>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', maxWidth: 480 }}>
+        <div style={{ marginBottom: 6, fontWeight: 800, fontSize: 14, color: '#111827' }}>구매 포인트 적립률 (%)</div>
+        <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+          결제 완료 금액의 입력한 % 만큼 구매자에게 포인트를 자동 지급합니다. (0 입력 시 미지급)
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.1}
+            value={rate}
+            onChange={e => setRate(e.target.value)}
+            placeholder="예: 5"
+            style={{
+              width: 120, padding: '10px 14px', border: '1.5px solid #E5E7EB', borderRadius: 10,
+              fontSize: 15, fontWeight: 700, fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>%</span>
+          <button
+            onClick={handleSave}
+            disabled={loading || rate === saved}
+            style={{
+              padding: '10px 22px', background: rate === saved ? '#E5E7EB' : '#111827',
+              color: rate === saved ? '#9CA3AF' : '#fff', border: 'none', borderRadius: 10,
+              fontSize: 14, fontWeight: 800, cursor: rate === saved ? 'default' : 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            {loading ? '저장 중...' : '저장'}
+          </button>
+        </div>
+        {saved && (
+          <div style={{ marginTop: 14, fontSize: 13, color: '#059669', fontWeight: 700 }}>
+            현재 적립률: {saved}%
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 ─────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, accessToken } = useAuth()
@@ -1119,6 +1196,7 @@ export default function AdminPage() {
     ['withdrawals', '환전 관리'],
     ['coupons',     '쿠폰 관리'],
     ['reports',     '신고 관리'],
+    ['settings',    '설정'],
   ]
 
   return (
@@ -1162,6 +1240,7 @@ export default function AdminPage() {
         {tab === 'withdrawals' && <WithdrawalsTab token={accessToken} />}
         {tab === 'coupons'     && <CouponsTab token={accessToken} />}
         {tab === 'reports'     && <ReportsTab token={accessToken} />}
+        {tab === 'settings'    && <SettingsTab token={accessToken} />}
       </main>
     </div>
   )
