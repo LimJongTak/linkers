@@ -55,6 +55,7 @@ export default function PointsPage() {
   // 계좌이체 스텝: 'select' | 'confirm' | 'done'
   const [step, setStep] = useState<'select' | 'confirm' | 'done'>('select')
   const [selectedAmount, setSelectedAmount] = useState(0)
+  const [customAmount, setCustomAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -89,7 +90,18 @@ export default function PointsPage() {
     }
   }
 
-  const resetBank = () => { setStep('select'); setSelectedAmount(0); setSubmitError('') }
+  const resetBank = () => { setStep('select'); setSelectedAmount(0); setCustomAmount(''); setSubmitError('') }
+
+  const handleCustomAmountChange = (val: string) => {
+    const digits = val.replace(/[^0-9]/g, '')
+    setCustomAmount(digits)
+    const num = parseInt(digits, 10)
+    if (!isNaN(num) && num >= 1000) {
+      setSelectedAmount(num)
+    } else {
+      setSelectedAmount(0)
+    }
+  }
 
   if (!user) return null
 
@@ -146,12 +158,39 @@ export default function PointsPage() {
               {step === 'select' && (
                 <>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>충전 금액 선택</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
                     {AMOUNTS.map(amt => (
-                      <button key={amt} onClick={() => setSelectedAmount(amt)} style={BTN_AMOUNT(selectedAmount === amt)}>
+                      <button key={amt} onClick={() => { setSelectedAmount(amt); setCustomAmount('') }} style={BTN_AMOUNT(selectedAmount === amt && !customAmount)}>
                         {(amt / 10000).toLocaleString()}만원
                       </button>
                     ))}
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', marginBottom: 6 }}>직접 입력 (최소 1,000원)</div>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={customAmount ? Number(customAmount).toLocaleString() : ''}
+                        onChange={e => handleCustomAmountChange(e.target.value.replace(/,/g, ''))}
+                        placeholder="금액 직접 입력"
+                        style={{
+                          width: '100%', padding: '12px 48px 12px 14px', borderRadius: 10, boxSizing: 'border-box',
+                          border: `2px solid ${customAmount && selectedAmount >= 1000 ? '#111827' : '#E5E7EB'}`,
+                          fontSize: 15, fontWeight: 800, fontFamily: 'inherit', outline: 'none',
+                          background: customAmount ? '#F9FAFB' : '#fff',
+                        }}
+                      />
+                      <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 700, color: '#9CA3AF' }}>원</span>
+                    </div>
+                    {customAmount && selectedAmount < 1000 && (
+                      <div style={{ fontSize: 11, color: '#EF4444', fontWeight: 700, marginTop: 4 }}>최소 1,000원 이상 입력해주세요</div>
+                    )}
+                    {customAmount && selectedAmount >= 1000 && (
+                      <div style={{ fontSize: 11, color: '#4F46E5', fontWeight: 700, marginTop: 4 }}>
+                        선택: {selectedAmount.toLocaleString()}원 → {selectedAmount.toLocaleString()}P 충전
+                      </div>
+                    )}
                   </div>
                   <button
                     disabled={!selectedAmount}

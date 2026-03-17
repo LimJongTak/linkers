@@ -2,15 +2,14 @@ import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
 
-const VALID_AMOUNTS = [10000, 30000, 50000, 100000, 200000, 300000]
-
 export async function POST(req: NextRequest) {
   try {
     const { userId } = verifyAccessToken(req)
     const { amount } = await req.json()
 
-    if (!VALID_AMOUNTS.includes(Number(amount))) {
-      throw new ApiError(400, '유효하지 않은 금액입니다')
+    const num = Number(amount)
+    if (!Number.isInteger(num) || num < 1000 || num > 10_000_000) {
+      throw new ApiError(400, '금액은 1,000원 이상 10,000,000원 이하로 입력해주세요')
     }
 
     // 이미 대기 중인 요청이 있으면 중복 방지
