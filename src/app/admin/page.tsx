@@ -8,7 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend,
 } from 'recharts'
 
-type Tab = 'dash' | 'users' | 'programs' | 'orders' | 'settlements' | 'downloads' | 'withdrawals' | 'coupons' | 'reports' | 'settings'
+type Tab = 'dash' | 'users' | 'programs' | 'orders' | 'settlements' | 'downloads' | 'withdrawals' | 'coupons' | 'reports' | 'deposits' | 'settings'
 
 function useAdminFetch<T>(url: string, token: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
@@ -1131,6 +1131,134 @@ function ReportsTab({ token }: { token: string | null }) {
   )
 }
 
+// ── 입금 관리 탭 ─────────────────────────────────────────────
+function DepositsTab({ token }: { token: string | null }) {
+  const [statusFilter, setStatusFilter] = useState('pending')
+  const [page, setPage] = useState(1)
+  const { show, Toast } = useToast()
+  const url = `/api/admin/deposits?status=${statusFilter}&page=${page}`
+  const { data, loading, reload } = useAdminFetch<any>(url, token, [statusFilter, page])
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [rejectModal, setRejectModal] = useState<{ id: string; nickname: string; amount: number } | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
+
+  const handleComplete = async (id: string) => {
+    setActionLoading(id)
+    const res = await fetch(`/api/admin/deposits/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'complete' }),
+    })
+    setActionLoading(null)
+    if (res.ok) { show('포인트 지급 완료!'); reload() }
+    else { const d = await res.json(); show(d.error ?? '오류 발생') }
+  }
+
+  const handleReject = async () => {
+    if (!rejectModal) return
+    setActionLoading(rejectModal.id)
+    const res = await fetch(`/api/admin/deposits/${rejectModal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'reject', admin_note: rejectNote }),
+    })
+    setActionLoading(null)
+    setRejectModal(null); setRejectNote('')
+    if (res.ok) { show('반려 처리 완료'); reload() }
+    else { const d = await res.json(); show(d.error ?? '오류 발생') }
+  }
+
+  const statusCfg: Record<string, [string, string, string]> = {
+    pending:   ['#92400E', '#FEF3C7', '처리 대기'],
+    completed: ['#065F46', '#D1FAE5', '충전 완료'],
+    rejected:  ['#991B1B', '#FEE2E2', '반려됨'],
+  }
+
+  return (
+    <>
+      {Toast}
+      {rejectModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setRejectModal(null)} />
+          <div style={{ position: 'relative', background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 380 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, color: '#111827' }}>입금 요청 반려</div>
+            <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>{rejectModal.nickname} · {rejectModal.amount.toLocaleString()}원</div>
+            <input value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+              placeholder="반려 사유 (선택)"
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, marginBottom: 14, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setRejectModal(null)} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid #E5E7EB', background: '#fff', color: '#6B7280', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
+              <button onClick={handleReject} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: '#DC2626', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>반려 처리</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[['pending','대기'], ['completed','완료'], ['rejected','반려'], ['all','전체']].map(([v, l]) => (
+          <button key={v} onClick={() => { setStatusFilter(v); setPage(1) }}
+            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+              background: statusFilter === v ? '#111827' : '#F3F4F6', color: statusFilter === v ? '#fff' : '#6B7280' }}>{l}</button>
+        ))}
+      </div>
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #F0EDE8', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+            <thead>
+              <tr style={{ background: '#F9FAFB' }}>
+                {['신청자', '금액', '상태', '신청일시', '처리일시', '관리'].map(h => (
+                  <th key={h} style={{ padding: '11px 14px', fontSize: 12, fontWeight: 700, color: '#6B7280', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#9CA3AF' }}>불러오는 중...</td></tr>
+                : data?.deposits?.length === 0
+                ? <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#9CA3AF' }}>입금 요청이 없습니다</td></tr>
+                : data?.deposits?.map((d: any) => {
+                    const [color, bg, label] = statusCfg[d.status] ?? ['#374151', '#F3F4F6', d.status]
+                    return (
+                      <tr key={d.id} style={{ borderTop: '1px solid #F3F4F6' }}>
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{d.user?.nickname ?? '—'}</div>
+                          <div style={{ fontSize: 12, color: '#9CA3AF' }}>{d.user?.email ?? ''}</div>
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: 14, fontWeight: 900, color: '#4F46E5' }}>{d.amount.toLocaleString()}원</td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 6, background: bg, color }}>{label}</span>
+                          {d.admin_note && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 3 }}>{d.admin_note}</div>}
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: 12, color: '#6B7280', whiteSpace: 'nowrap' }}>{new Date(d.requested_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: '12px 14px', fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>{d.processed_at ? new Date(d.processed_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                        <td style={{ padding: '12px 14px' }}>
+                          {d.status === 'pending' && (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={() => handleComplete(d.id)}
+                                disabled={actionLoading === d.id}
+                                style={{ fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 6, border: 'none', background: '#D1FAE5', color: '#065F46', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                                {actionLoading === d.id ? '처리중' : '입금 확인'}
+                              </button>
+                              <button
+                                onClick={() => setRejectModal({ id: d.id, nickname: d.user?.nickname, amount: d.amount })}
+                                style={{ fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                반려
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <Pagination page={page} totalPages={data?.totalPages ?? 1} onChange={setPage} />
+    </>
+  )
+}
+
 // ── 설정 탭 ──────────────────────────────────────────────────
 function SettingsTab({ token }: { token: string | null }) {
   const [rate, setRate] = useState('')
@@ -1231,6 +1359,7 @@ export default function AdminPage() {
     ['withdrawals', '환전 관리'],
     ['coupons',     '쿠폰 관리'],
     ['reports',     '신고 관리'],
+    ['deposits',    '입금 관리'],
     ['settings',    '설정'],
   ]
 
@@ -1275,6 +1404,7 @@ export default function AdminPage() {
         {tab === 'withdrawals' && <WithdrawalsTab token={accessToken} />}
         {tab === 'coupons'     && <CouponsTab token={accessToken} />}
         {tab === 'reports'     && <ReportsTab token={accessToken} />}
+        {tab === 'deposits'    && <DepositsTab token={accessToken} />}
         {tab === 'settings'    && <SettingsTab token={accessToken} />}
       </main>
     </div>

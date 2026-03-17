@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { useAuth } from '@/store/auth'
 
-type TxType = 'charge_card' | 'charge_gift_card' | 'charge_admin' | 'purchase' | 'refund'
+type TxType = 'charge_card' | 'charge_gift_card' | 'charge_bank' | 'charge_admin' | 'purchase' | 'purchase_reward' | 'refund'
 
 interface PointTx {
   id: string
@@ -15,22 +15,32 @@ interface PointTx {
   created_at: string
 }
 
+interface DepositReq {
+  id: string
+  amount: number
+  status: 'pending' | 'completed' | 'rejected'
+  requested_at: string
+  processed_at: string | null
+  admin_note: string | null
+}
+
 const TX_LABEL: Record<TxType, string> = {
   charge_card:      '카드 충전',
   charge_gift_card: '상품권 충전',
+  charge_bank:      '계좌이체 충전',
   charge_admin:     '관리자 지급',
   purchase:         '구매 차감',
+  purchase_reward:  '구매 적립',
   refund:           '환불',
 }
 
-const CARD_AMOUNTS = [10000, 30000, 50000, 100000, 200000, 300000]
+const AMOUNTS = [10000, 30000, 50000, 100000, 200000, 300000]
 
-const GIFT_PROVIDERS = [
-  { id: 'cultureland',  name: '문화상품권',      placeholder: '0000-0000-0000-0000' },
-  { id: 'booknlife',    name: '도서문화상품권',   placeholder: '0000-0000-0000-0000' },
-  { id: 'happymoney',   name: '해피머니',         placeholder: '0000-0000-0000-0000' },
-  { id: 'smartculture', name: '스마트문화상품권', placeholder: '000000000000000000' },
-]
+const BANK_INFO = {
+  bank:   '카카오뱅크',
+  account: '3333-07-6590136',
+  holder: '임종탁',
+}
 
 export default function PointsPage() {
   const { user, accessToken } = useAuth()
@@ -40,74 +50,64 @@ export default function PointsPage() {
   const [txList, setTxList] = useState<PointTx[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 충전 탭
-  const [tab, setTab] = useState<'gift' | 'card'>('gift')
+  const [tab, setTab] = useState<'bank' | 'card'>('bank')
 
-  // 상품권
-  const [provider, setProvider] = useState('cultureland')
-  const [pin, setPin] = useState('')
-  const [giftLoading, setGiftLoading] = useState(false)
-  const [giftMsg, setGiftMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  // 계좌이체 스텝: 'select' | 'confirm' | 'done'
+  const [step, setStep] = useState<'select' | 'confirm' | 'done'>('select')
+  const [selectedAmount, setSelectedAmount] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
-  // 카드
-  const [cardAmount, setCardAmount] = useState(10000)
-  const [cardLoading, setCardLoading] = useState(false)
-  const [cardMsg, setCardMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [myDeposits, setMyDeposits] = useState<DepositReq[]>([])
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return }
-    fetch('/api/points', { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(r => r.json())
-      .then(d => { setPoints(d.points ?? 0); setTxList(d.transactions ?? []) })
-      .finally(() => setLoading(false))
+    Promise.all([
+      fetch('/api/points', { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+      fetch('/api/points/deposit', { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+    ]).then(([pd, dd]) => {
+      setPoints(pd.points ?? 0)
+      setTxList(pd.transactions ?? [])
+      setMyDeposits(dd.deposits ?? [])
+    }).finally(() => setLoading(false))
   }, [user, accessToken, router])
 
-  const handleGiftCharge = async () => {
-    setGiftLoading(true); setGiftMsg(null)
-    try {
-      const res = await fetch('/api/points/charge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ method: 'gift_card', provider, pin }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        const msg: Record<string, string> = {
-          GIFT_CARD_ALREADY_USED: '이미 사용된 상품권입니다.',
-          INVALID_PIN_FORMAT: '핀번호 형식이 올바르지 않습니다.',
-        }
-        setGiftMsg({ ok: false, text: msg[data.error] ?? '충전 실패. 다시 시도해주세요.' })
-      } else {
-        setPoints(data.points)
-        setPin('')
-        setGiftMsg({ ok: true, text: `${data.charged.toLocaleString()}P 충전 완료!` })
-        setTxList(prev => [{ id: Date.now().toString(), amount: data.charged, type: 'charge_gift_card', description: `${GIFT_PROVIDERS.find(p => p.id === provider)?.name} 충전`, created_at: new Date().toISOString() }, ...prev])
-      }
-    } finally { setGiftLoading(false) }
+  const handleDepositRequest = async () => {
+    setSubmitting(true); setSubmitError('')
+    const res = await fetch('/api/points/deposit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ amount: selectedAmount }),
+    })
+    const d = await res.json()
+    setSubmitting(false)
+    if (res.ok) {
+      setMyDeposits(prev => [d.deposit, ...prev])
+      setStep('done')
+    } else {
+      setSubmitError(d.error ?? '요청 실패. 다시 시도해주세요.')
+    }
   }
 
-  const handleCardCharge = async () => {
-    setCardLoading(true); setCardMsg(null)
-    // 실제론 PortOne 결제 UI 먼저 띄운 후 payment_id 받아서 처리
-    // 현재는 직접 충전 (PortOne 연동 시 교체)
-    try {
-      const res = await fetch('/api/points/charge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ method: 'card', card_amount: cardAmount }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setCardMsg({ ok: false, text: '충전 실패. 다시 시도해주세요.' })
-      } else {
-        setPoints(data.points)
-        setCardMsg({ ok: true, text: `${data.charged.toLocaleString()}P 충전 완료!` })
-        setTxList(prev => [{ id: Date.now().toString(), amount: data.charged, type: 'charge_card', description: `카드 충전 ${data.charged.toLocaleString()}원`, created_at: new Date().toISOString() }, ...prev])
-      }
-    } finally { setCardLoading(false) }
-  }
+  const resetBank = () => { setStep('select'); setSelectedAmount(0); setSubmitError('') }
 
   if (!user) return null
+
+  const CARD: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: 24, marginBottom: 20, border: '1px solid #F0EDE8' }
+  const BTN_AMOUNT = (selected: boolean): React.CSSProperties => ({
+    padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+    border: `2px solid ${selected ? '#111827' : '#E5E7EB'}`,
+    background: selected ? '#111827' : '#fff',
+    color: selected ? '#fff' : '#374151',
+    transition: 'all 0.15s',
+  })
+
+  const depositStatusLabel: Record<string, [string, string]> = {
+    pending:   ['#92400E', '#FEF3C7'],
+    completed: ['#065F46', '#D1FAE5'],
+    rejected:  ['#991B1B', '#FEE2E2'],
+  }
+  const depositStatusText: Record<string, string> = { pending: '처리 대기', completed: '충전 완료', rejected: '반려됨' }
 
   return (
     <div style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
@@ -124,93 +124,162 @@ export default function PointsPage() {
         </div>
 
         {/* 충전 섹션 */}
-        <div style={{ background: '#fff', borderRadius: 20, padding: 24, marginBottom: 20, border: '1px solid #F0EDE8' }}>
+        <div style={CARD}>
           <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: '#111827' }}>포인트 충전</div>
 
           {/* 탭 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            {([['gift', '상품권'], ['card', '카드']] as const).map(([t, label]) => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
-                background: tab === t ? '#111827' : '#F5F4F1', color: tab === t ? '#fff' : '#6B7280',
+          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+            {(['bank', 'card'] as const).map(t => (
+              <button key={t} onClick={() => { setTab(t); resetBank() }} style={{
+                flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
+                background: tab === t ? '#111827' : '#F5F4F1',
+                color: tab === t ? '#fff' : '#6B7280',
                 transition: 'all 0.15s',
-              }}>{label}</button>
+              }}>{t === 'bank' ? '계좌이체' : '카드결제'}</button>
             ))}
           </div>
 
-          {/* 상품권 충전 */}
-          {tab === 'gift' && (
+          {/* ── 계좌이체 ── */}
+          {tab === 'bank' && (
             <>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 8 }}>상품권 종류</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {GIFT_PROVIDERS.map(p => (
-                    <button key={p.id} onClick={() => { setProvider(p.id); setPin('') }} style={{
-                      padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, textAlign: 'left',
-                      border: `2px solid ${provider === p.id ? '#111827' : '#E5E7EB'}`,
-                      background: provider === p.id ? '#F9FAFB' : '#fff',
-                      color: provider === p.id ? '#111827' : '#6B7280',
-                      transition: 'all 0.15s',
-                    }}>{p.name}</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 6 }}>핀번호</div>
-                <input
-                  value={pin}
-                  onChange={e => setPin(e.target.value)}
-                  placeholder={GIFT_PROVIDERS.find(p => p.id === provider)?.placeholder}
-                  style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 15, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-              {giftMsg && (
-                <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 12, background: giftMsg.ok ? '#F0FDF4' : '#FEF2F2', color: giftMsg.ok ? '#166534' : '#991B1B', fontSize: 13, fontWeight: 700 }}>
-                  {giftMsg.ok ? '✓' : '✕'} {giftMsg.text}
+              {step === 'select' && (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>충전 금액 선택</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+                    {AMOUNTS.map(amt => (
+                      <button key={amt} onClick={() => setSelectedAmount(amt)} style={BTN_AMOUNT(selectedAmount === amt)}>
+                        {(amt / 10000).toLocaleString()}만원
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    disabled={!selectedAmount}
+                    onClick={() => setStep('confirm')}
+                    style={{
+                      width: '100%', padding: '14px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 800, fontFamily: 'inherit',
+                      background: selectedAmount ? '#111827' : '#F3F4F6',
+                      color: selectedAmount ? '#fff' : '#9CA3AF',
+                      cursor: selectedAmount ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    다음 — 입금 안내 확인
+                  </button>
+                </>
+              )}
+
+              {step === 'confirm' && (
+                <>
+                  {/* 입금 안내 */}
+                  <div style={{ background: '#F0F9FF', border: '1.5px solid #BAE6FD', borderRadius: 14, padding: '20px 20px', marginBottom: 20 }}>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: '#0369A1', marginBottom: 14 }}>입금 계좌 안내</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>은행</span>
+                        <span style={{ fontWeight: 800, color: '#111827' }}>{BANK_INFO.bank}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>계좌번호</span>
+                        <span style={{ fontWeight: 900, color: '#111827', letterSpacing: 1 }}>{BANK_INFO.account}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>예금주</span>
+                        <span style={{ fontWeight: 800, color: '#111827' }}>{BANK_INFO.holder}</span>
+                      </div>
+                      <div style={{ height: 1, background: '#BAE6FD', margin: '4px 0' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>입금 금액</span>
+                        <span style={{ fontWeight: 900, color: '#0369A1', fontSize: 16 }}>{selectedAmount.toLocaleString()}원</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '12px 14px', marginBottom: 20, fontSize: 13, color: '#92400E', fontWeight: 600, lineHeight: 1.6 }}>
+                    위 계좌로 <strong>{selectedAmount.toLocaleString()}원</strong>을 입금하신 후 아래 버튼을 눌러주세요.<br />
+                    입금 확인 후 <strong>최대 1시간 내</strong>에 포인트가 지급됩니다.
+                  </div>
+
+                  {submitError && (
+                    <div style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
+                      {submitError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={resetBank} style={{
+                      flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid #E5E7EB',
+                      fontSize: 14, fontWeight: 700, background: '#fff', color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
+                    }}>이전</button>
+                    <button onClick={handleDepositRequest} disabled={submitting} style={{
+                      flex: 2, padding: '13px', borderRadius: 12, border: 'none',
+                      fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: submitting ? 'not-allowed' : 'pointer',
+                      background: '#111827', color: '#fff', opacity: submitting ? 0.7 : 1,
+                    }}>
+                      {submitting ? '처리 중...' : '입금 완료했어요'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {step === 'done' && (
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+                  <div style={{ fontSize: 17, fontWeight: 900, color: '#111827', marginBottom: 8 }}>입금 요청이 접수되었습니다</div>
+                  <div style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.7, marginBottom: 24 }}>
+                    입금 확인 후 <strong style={{ color: '#111827' }}>최대 1시간 내</strong>로 포인트를 지급해드립니다.<br />
+                    처리 완료 시 포인트 내역에서 확인하실 수 있습니다.
+                  </div>
+                  <button onClick={resetBank} style={{
+                    padding: '12px 28px', borderRadius: 12, border: 'none', background: '#111827',
+                    color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>다시 충전하기</button>
                 </div>
               )}
-              <button onClick={handleGiftCharge} disabled={!pin.trim() || giftLoading} style={{
-                width: '100%', padding: '14px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: pin.trim() ? 'pointer' : 'not-allowed',
-                background: pin.trim() ? '#111827' : '#F3F4F6', color: pin.trim() ? '#fff' : '#9CA3AF', transition: 'all 0.15s',
-              }}>{giftLoading ? '확인 중...' : '상품권 충전하기'}</button>
             </>
           )}
 
-          {/* 카드 충전 */}
+          {/* ── 카드결제 (추후 예정) ── */}
           {tab === 'card' && (
-            <>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 8 }}>충전 금액 선택</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                  {CARD_AMOUNTS.map(amt => (
-                    <button key={amt} onClick={() => setCardAmount(amt)} style={{
-                      padding: '12px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
-                      border: `2px solid ${cardAmount === amt ? '#111827' : '#E5E7EB'}`,
-                      background: cardAmount === amt ? '#111827' : '#fff',
-                      color: cardAmount === amt ? '#fff' : '#374151',
-                      transition: 'all 0.15s',
-                    }}>{(amt / 10000).toLocaleString()}만원</button>
-                  ))}
-                </div>
+            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <div style={{ fontSize: 36, marginBottom: 14 }}>💳</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#374151', marginBottom: 8 }}>카드 결제</div>
+              <div style={{ fontSize: 14, color: '#9CA3AF', lineHeight: 1.7 }}>
+                카드 결제 기능은 현재 준비 중입니다.<br />
+                빠른 시일 내에 서비스를 제공할 예정입니다.
               </div>
-              <div style={{ background: '#F9FAFB', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#6B7280' }}>
-                충전 금액 <strong style={{ color: '#111827' }}>{cardAmount.toLocaleString()}원</strong> → <strong style={{ color: '#4F46E5' }}>{cardAmount.toLocaleString()}P</strong> 적립
+              <div style={{ marginTop: 16, display: 'inline-block', background: '#F3F4F6', color: '#9CA3AF', fontSize: 12, fontWeight: 800, padding: '6px 14px', borderRadius: 20 }}>
+                추후 기능 추가 예정
               </div>
-              {cardMsg && (
-                <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 12, background: cardMsg.ok ? '#F0FDF4' : '#FEF2F2', color: cardMsg.ok ? '#166534' : '#991B1B', fontSize: 13, fontWeight: 700 }}>
-                  {cardMsg.ok ? '✓' : '✕'} {cardMsg.text}
-                </div>
-              )}
-              <button onClick={handleCardCharge} disabled={cardLoading} style={{
-                width: '100%', padding: '14px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-                background: '#111827', color: '#fff', transition: 'all 0.15s',
-              }}>{cardLoading ? '처리 중...' : `${cardAmount.toLocaleString()}원 카드 결제`}</button>
-            </>
+            </div>
           )}
         </div>
 
-        {/* 내역 */}
-        <div style={{ background: '#fff', borderRadius: 20, padding: 24, border: '1px solid #F0EDE8' }}>
+        {/* 내 입금 요청 내역 */}
+        {myDeposits.length > 0 && (
+          <div style={CARD}>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 14, color: '#111827' }}>입금 요청 내역</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {myDeposits.map(d => {
+                const [color, bg] = depositStatusLabel[d.status]
+                return (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #F5F4F1' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>계좌이체 {d.amount.toLocaleString()}원</div>
+                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
+                        {new Date(d.requested_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {d.admin_note && <span style={{ marginLeft: 6, color: '#EF4444' }}>· {d.admin_note}</span>}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 6, background: bg, color }}>{depositStatusText[d.status]}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 포인트 내역 */}
+        <div style={CARD}>
           <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: '#111827' }}>포인트 내역</div>
           {loading ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: '#9CA3AF', fontSize: 14 }}>불러오는 중...</div>
@@ -223,7 +292,7 @@ export default function PointsPage() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 2 }}>{tx.description}</div>
                     <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                      {TX_LABEL[tx.type]} · {new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {TX_LABEL[tx.type] ?? tx.type} · {new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 900, color: tx.amount > 0 ? '#4F46E5' : '#EF4444' }}>

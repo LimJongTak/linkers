@@ -23,6 +23,7 @@ model User {
   updated_at     DateTime  @updatedAt
 
   programs           Program[]
+  deposit_requests   DepositRequest[]
   orders             Order[]
   reviews            Review[]
   permissions        DownloadPermission[]
@@ -413,6 +414,20 @@ model Report {
   @@map("reports")
 }
 
+model DepositRequest {
+  id           String        @id @default(uuid())
+  user_id      String
+  amount       Int
+  status       DepositStatus @default(pending)
+  admin_note   String?
+  requested_at DateTime      @default(now())
+  processed_at DateTime?
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("deposit_requests")
+}
+
 model AdminSetting {
   key        String   @id
   value      String
@@ -440,10 +455,17 @@ enum ProductType {
 enum PointTransactionType {
   charge_card
   charge_gift_card
+  charge_bank
   charge_admin
   purchase
   purchase_reward
   refund
+}
+
+enum DepositStatus {
+  pending
+  completed
+  rejected
 }
 
 enum UserRole {
