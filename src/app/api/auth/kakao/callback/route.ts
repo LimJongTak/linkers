@@ -29,10 +29,15 @@ export async function GET(req: NextRequest) {
 
     const { id, kakao_account } = userRes.data
 
+    const oauthKey = { oauth_provider: 'kakao', oauth_id: String(id) }
+    const existing = await db.user.findUnique({
+      where: { oauth_provider_oauth_id: oauthKey },
+      select: { id: true },
+    })
+    const isNew = !existing
+
     const user = await db.user.upsert({
-      where: {
-        oauth_provider_oauth_id: { oauth_provider: 'kakao', oauth_id: String(id) },
-      },
+      where: { oauth_provider_oauth_id: oauthKey },
       create: {
         email: kakao_account?.email ?? null,
         nickname: kakao_account?.profile?.nickname ?? `사용자_${String(id).slice(-4)}`,
@@ -42,7 +47,6 @@ export async function GET(req: NextRequest) {
         role: 'buyer',
       },
       update: {
-        nickname: kakao_account?.profile?.nickname,
         profile_image: kakao_account?.profile?.thumbnail_image_url,
       },
     })
@@ -52,12 +56,12 @@ export async function GET(req: NextRequest) {
       role: user.role as any,
     })
 
-    // Access Token은 쿼리스트링으로 전달, /login에서 처리 후 /my로 이동
     const redirectUrl = new URL('/login', process.env.NEXT_PUBLIC_API_BASE ?? req.nextUrl.origin)
     redirectUrl.searchParams.set('at', accessToken)
     redirectUrl.searchParams.set('uid', user.id)
     redirectUrl.searchParams.set('nick', user.nickname)
     redirectUrl.searchParams.set('role', user.role)
+    if (isNew) redirectUrl.searchParams.set('new', '1')
 
     const response = NextResponse.redirect(redirectUrl)
     // Refresh Token → HttpOnly 쿠키

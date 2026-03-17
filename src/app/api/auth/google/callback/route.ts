@@ -32,10 +32,15 @@ export async function GET(req: NextRequest) {
     })
     const googleUser = await userRes.json()
 
+    const oauthKey = { oauth_provider: 'google', oauth_id: String(googleUser.id) }
+    const existing = await db.user.findUnique({
+      where: { oauth_provider_oauth_id: oauthKey },
+      select: { id: true },
+    })
+    const isNew = !existing
+
     const user = await db.user.upsert({
-      where: {
-        oauth_provider_oauth_id: { oauth_provider: 'google', oauth_id: String(googleUser.id) },
-      },
+      where: { oauth_provider_oauth_id: oauthKey },
       create: {
         email: googleUser.email ?? null,
         nickname: googleUser.name ?? googleUser.email?.split('@')[0] ?? `user_${String(googleUser.id).slice(-4)}`,
@@ -45,7 +50,6 @@ export async function GET(req: NextRequest) {
         role: 'buyer',
       },
       update: {
-        nickname: googleUser.name,
         profile_image: googleUser.picture,
       },
     })
@@ -57,6 +61,7 @@ export async function GET(req: NextRequest) {
     redirectUrl.searchParams.set('uid', user.id)
     redirectUrl.searchParams.set('nick', user.nickname)
     redirectUrl.searchParams.set('role', user.role)
+    if (isNew) redirectUrl.searchParams.set('new', '1')
 
     const response = NextResponse.redirect(redirectUrl)
     response.cookies.set('refresh_token', refreshToken, {
