@@ -179,7 +179,7 @@ export default function ProgramDetailPage() {
     if (!p) return
     setPayError('')
 
-    const effectivePrice = couponResult ? couponResult.finalPrice : p.price
+    const effectivePrice = couponResult ? couponResult.finalPrice : displayPrice
     if (payMethod === 'point' && (userPoints === null || userPoints < effectivePrice)) {
       setPayError('포인트가 부족합니다.')
       return
@@ -731,7 +731,7 @@ export default function ProgramDetailPage() {
                   {couponResult && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontSize: 13, color: '#374151' }}>정가</span>
-                      <span style={{ fontSize: 13, color: '#9CA3AF', textDecoration: 'line-through' }}>{fmt(p.price)}</span>
+                      <span style={{ fontSize: 13, color: '#9CA3AF', textDecoration: 'line-through' }}>{fmt(displayPrice)}</span>
                     </div>
                   )}
                   {couponResult && (
@@ -742,12 +742,12 @@ export default function ProgramDetailPage() {
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>총 결제 금액</span>
-                    <span style={{ fontSize: 16, fontWeight: 900, color: '#111827' }}>{fmt(couponResult ? couponResult.finalPrice : p.price)}</span>
+                    <span style={{ fontSize: 16, fontWeight: 900, color: '#111827' }}>{fmt(couponResult ? couponResult.finalPrice : displayPrice)}</span>
                   </div>
                   {payMethod === 'point' && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                       <span style={{ fontSize: 13, color: '#4F46E5', fontWeight: 700 }}>포인트 차감</span>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: '#4F46E5' }}>-{(couponResult ? couponResult.finalPrice : p.price).toLocaleString()}P</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#4F46E5' }}>-{(couponResult ? couponResult.finalPrice : displayPrice).toLocaleString()}P</span>
                     </div>
                   )}
                 </div>
@@ -757,7 +757,7 @@ export default function ProgramDetailPage() {
                     background: payMethod === 'kakao' ? '#FEE500' : payMethod === 'toss' ? '#0064FF' : payMethod === 'point' ? '#4F46E5' : isFile ? '#0369A1' : '#111827',
                     color: payMethod === 'kakao' ? '#1A1A1A' : '#fff',
                   }}>
-                  {payMethod === 'point' ? `${(couponResult ? couponResult.finalPrice : p.price).toLocaleString()}P 사용하여 결제` : `${fmt(couponResult ? couponResult.finalPrice : p.price)} 결제하기`}
+                  {payMethod === 'point' ? `${(couponResult ? couponResult.finalPrice : displayPrice).toLocaleString()}P 사용하여 결제` : `${fmt(couponResult ? couponResult.finalPrice : displayPrice)} 결제하기`}
                 </button>
               </>
             )}
