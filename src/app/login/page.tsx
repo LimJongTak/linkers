@@ -138,14 +138,15 @@ function LoginContent() {
   const handleKakaoLogin = () => {
     const clientId    = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID
     if (!clientId) { alert('카카오 로그인 설정이 필요합니다. 관리자에게 문의하세요.'); return }
-    const redirectUri = `${window.location.origin}/api/auth/kakao/callback`
+    const base = process.env.NEXT_PUBLIC_API_BASE ?? window.location.origin
+    const redirectUri = `${base}/api/auth/kakao/callback`
     window.location.href = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}`
   }
 
   // 구글 로그인
   const handleGoogleLogin = () => {
     const clientId    = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-    const redirectUri = `${window.location.origin}/api/auth/google/callback`
+    const redirectUri = `${process.env.NEXT_PUBLIC_API_BASE ?? window.location.origin}/api/auth/google/callback`
     if (!clientId) { alert('구글 로그인 설정이 필요합니다. .env.local에 NEXT_PUBLIC_GOOGLE_CLIENT_ID를 추가해주세요.'); return }
     const params = new URLSearchParams({
       client_id: clientId,
