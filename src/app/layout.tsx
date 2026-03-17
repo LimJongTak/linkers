@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import ClientProviders from './ClientProviders'
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://linkers.vercel.app'
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://linkers-seven.vercel.app'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -20,11 +20,20 @@ export const metadata: Metadata = {
     description: '대학생이 만들고 학교가 활용하는 교육 프로그램 마켓플레이스. 파일 구매, 강의 신청, 안전한 결제까지.',
     url: siteUrl,
     locale: 'ko_KR',
+    images: [
+      {
+        url: `${siteUrl}/api/og`,
+        width: 1200,
+        height: 630,
+        alt: '링커스 — 학교 교육 프로그램 중개 플랫폼',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: '링커스 — 학교 교육 프로그램 중개 플랫폼',
     description: '대학생이 만들고 학교가 활용하는 교육 프로그램 마켓플레이스.',
+    images: [`${siteUrl}/api/og`],
   },
   icons: {
     icon: '/icon.svg',
