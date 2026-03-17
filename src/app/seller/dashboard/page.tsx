@@ -99,9 +99,19 @@ function SaleForm({
     setSaving(true)
     try {
       await onSave(salePrice, saleStartAt, saleEndAt)
-    } catch {
-      setError('저장 실패')
-    } finally {
+      // 성공 시 onSave 내부에서 폼이 닫힘 (setSaleFormOpen(null))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '저장 실패. 다시 시도해 주세요.')
+      setSaving(false) // 실패 시에만 여기서 저장 중 해제 (폼 유지)
+    }
+  }
+
+  const handleEnd = async () => {
+    setSaving(true)
+    try {
+      await onEnd()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '세일 종료 실패')
       setSaving(false)
     }
   }
@@ -154,8 +164,8 @@ function SaleForm({
           {saving ? '저장 중...' : '💾 세일 적용'}
         </button>
         {program.salePrice && (
-          <button onClick={onEnd}
-            style={{ fontSize: 12, fontWeight: 700, background: '#F3F4F6', color: '#6B7280', borderRadius: 7, padding: '6px 14px', border: 'none', cursor: 'pointer' }}>
+          <button onClick={handleEnd} disabled={saving}
+            style={{ fontSize: 12, fontWeight: 700, background: '#F3F4F6', color: '#6B7280', borderRadius: 7, padding: '6px 14px', border: 'none', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
             세일 종료
           </button>
         )}
@@ -224,21 +234,30 @@ export default function SellerDashboardPage() {
   }
 
   const handleSetSale = async (programId: string, salePrice: string, saleStartAt: string, saleEndAt: string) => {
-    await fetch(`/api/seller/programs/${programId}`, {
+    const res = await fetch(`/api/seller/programs/${programId}`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ action: 'set_sale', salePrice, saleStartAt: saleStartAt || null, saleEndAt: saleEndAt || null }),
     })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.detail ?? d.error ?? d.message ?? '세일 저장 실패')
+    }
+    // 성공한 경우에만 폼 닫기
     setSaleFormOpen(null)
     await refreshPrograms()
   }
 
   const handleEndSale = async (programId: string) => {
-    await fetch(`/api/seller/programs/${programId}`, {
+    const res = await fetch(`/api/seller/programs/${programId}`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ action: 'end_sale' }),
     })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.detail ?? d.error ?? d.message ?? '세일 종료 실패')
+    }
     setSaleFormOpen(null)
     await refreshPrograms()
   }
