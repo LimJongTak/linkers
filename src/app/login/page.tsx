@@ -137,10 +137,9 @@ function LoginContent() {
   // 카카오 로그인
   const handleKakaoLogin = () => {
     const clientId    = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID
-    const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI ?? `${window.location.origin}/api/auth/kakao/callback`
-    if (clientId) {
-      window.location.href = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}`
-    }
+    if (!clientId) { alert('카카오 로그인 설정이 필요합니다. 관리자에게 문의하세요.'); return }
+    const redirectUri = `${window.location.origin}/api/auth/kakao/callback`
+    window.location.href = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}`
   }
 
   // 구글 로그인

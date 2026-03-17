@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
     const clientId     = process.env.GOOGLE_CLIENT_ID!
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!
-    const redirectUri  = process.env.GOOGLE_REDIRECT_URI ?? `${process.env.NEXT_PUBLIC_API_BASE}/api/auth/google/callback`
+    const redirectUri  = `${req.nextUrl.origin}/api/auth/google/callback`
 
     // code → access_token
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
     const { accessToken, refreshToken } = issueTokens({ userId: user.id, role: user.role as any })
 
-    const redirectUrl = new URL('/login', process.env.NEXT_PUBLIC_API_BASE!)
+    const redirectUrl = new URL('/login', req.nextUrl.origin)
     redirectUrl.searchParams.set('at', accessToken)
     redirectUrl.searchParams.set('uid', user.id)
     redirectUrl.searchParams.set('nick', user.nickname)

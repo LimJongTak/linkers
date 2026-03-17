@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         grant_type: 'authorization_code',
         client_id: process.env.KAKAO_CLIENT_ID!,
         client_secret: process.env.KAKAO_CLIENT_SECRET!,
-        redirect_uri: process.env.KAKAO_REDIRECT_URI!,
+        redirect_uri: `${req.nextUrl.origin}/api/auth/kakao/callback`,
         code,
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Access Token은 쿼리스트링으로 전달, /login에서 처리 후 /my로 이동
-    const redirectUrl = new URL('/login', process.env.NEXT_PUBLIC_API_BASE!)
+    const redirectUrl = new URL('/login', req.nextUrl.origin)
     redirectUrl.searchParams.set('at', accessToken)
     redirectUrl.searchParams.set('uid', user.id)
     redirectUrl.searchParams.set('nick', user.nickname)
