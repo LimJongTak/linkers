@@ -21,11 +21,23 @@ export async function POST(req: NextRequest) {
         where: portoneConfigured
           ? { id: programId, status: 'active' }
           : { id: programId, status: { not: 'deleted' } },
-        select: { id: true, price: true, title: true, seller_id: true },
+        select: { id: true, price: true, title: true, seller_id: true, sale_price: true, sale_start_at: true, sale_end_at: true },
       }),
       db.user.findUniqueOrThrow({ where: { id: user.userId }, select: { points: true } }),
     ])
     if (!program) throw new ApiError(404, '프로그램을 찾을 수 없습니다')
+
+    // 세일 유효 여부 계산
+    const now = new Date()
+    const isSaleActive = !!(
+      program.sale_price &&
+      program.sale_price > 0 &&
+      program.sale_price < program.price &&
+      (!program.sale_start_at || program.sale_start_at <= now) &&
+      (!program.sale_end_at || program.sale_end_at >= now)
+    )
+    // 판매자가 받는 금액 기준 (세일 중이면 세일가, 아니면 정가) — 쿠폰 할인 전
+    const effectivePrice = isSaleActive ? program.sale_price! : program.price
 
     // 쿠폰 검증
     let couponDiscount = 0
@@ -37,19 +49,20 @@ export async function POST(req: NextRequest) {
       if (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit) throw new ApiError(400, '사용 한도 초과 쿠폰입니다')
       if (coupon.scope === 'seller' && coupon.seller_id !== program.seller_id) throw new ApiError(400, '이 상품에 사용할 수 없는 쿠폰입니다')
       if (coupon.scope === 'program' && coupon.program_id !== program.id) throw new ApiError(400, '이 상품에 사용할 수 없는 쿠폰입니다')
-      if (program.price < coupon.min_price) throw new ApiError(400, `최소 ${coupon.min_price.toLocaleString()}원 이상 구매 시 사용 가능합니다`)
+      if (effectivePrice < coupon.min_price) throw new ApiError(400, `최소 ${coupon.min_price.toLocaleString()}원 이상 구매 시 사용 가능합니다`)
       const userUsage = await db.couponUsage.count({ where: { coupon_id: coupon.id, user_id: user.userId } })
       if (userUsage >= coupon.per_user_limit) throw new ApiError(400, '이미 사용한 쿠폰입니다')
       if (coupon.type === 'percentage') {
-        couponDiscount = Math.floor(program.price * coupon.discount_value / 100)
+        couponDiscount = Math.floor(effectivePrice * coupon.discount_value / 100)
         if (coupon.max_discount) couponDiscount = Math.min(couponDiscount, coupon.max_discount)
       } else {
-        couponDiscount = Math.min(coupon.discount_value, program.price)
+        couponDiscount = Math.min(coupon.discount_value, effectivePrice)
       }
       couponRecord = coupon
     }
 
-    const discountedPrice = Math.max(0, program.price - couponDiscount)
+    // buyer가 실제 내는 금액 = 세일가(또는 정가) - 쿠폰할인
+    const discountedPrice = Math.max(0, effectivePrice - couponDiscount)
     const pointsToUse = Math.min(Math.max(0, Math.floor(usePoints)), discountedPrice, buyer.points)
     const cardAmount = discountedPrice - pointsToUse
     const paymentMethod = pointsToUse === 0 ? 'card' : cardAmount === 0 ? 'point' : 'mixed'
@@ -66,7 +79,8 @@ export async function POST(req: NextRequest) {
       order_number: orderNumber,
       buyer_id: user.userId,
       program_id: programId,
-      amount: discountedPrice,
+      amount: discountedPrice,           // buyer 실납부액 (쿠폰 할인 후)
+      seller_amount: effectivePrice,     // 판매자 수익 기준 (쿠폰 할인 전, 세일가 반영)
       point_amount: pointsToUse,
       payment_method: paymentMethod,
       status: (isPaid ? 'paid' : 'pending') as 'paid' | 'pending',

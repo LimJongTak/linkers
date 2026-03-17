@@ -19,6 +19,9 @@ interface DBProgram {
   target_levels: string[]
   region: string[]
   price: number
+  sale_price: number | null
+  sale_start_at: string | null
+  sale_end_at: string | null
   description: string
   file_format: string | null
   page_count: number | null
@@ -235,7 +238,16 @@ export default function ProgramDetailPage() {
 
   const isFile  = p.product_type === 'file_product'
   const rating  = parseFloat(p.rating_avg) || 0
-  const effectivePrice = couponResult ? couponResult.finalPrice : p.price
+  // 세일 유효 여부
+  const now = new Date()
+  const isSaleActive = !!(
+    p.sale_price && p.sale_price > 0 && p.sale_price < p.price &&
+    (!p.sale_start_at || new Date(p.sale_start_at) <= now) &&
+    (!p.sale_end_at || new Date(p.sale_end_at) >= now)
+  )
+  const displayPrice = isSaleActive ? p.sale_price! : p.price
+  const saleRate = isSaleActive ? Math.round((1 - p.sale_price! / p.price) * 100) : 0
+  const effectivePrice = couponResult ? couponResult.finalPrice : displayPrice
   const notEnough = userPoints !== null && userPoints < effectivePrice
 
   return (
@@ -467,7 +479,22 @@ export default function ProgramDetailPage() {
           {/* 오른쪽 구매 박스 */}
           <div className="sticky-box" style={{ position: 'sticky', top: 80, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ background: '#fff', borderRadius: 20, padding: 24, border: '1px solid #F0EDE8', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: 28, fontWeight: 900, color: p.price === 0 ? '#10B981' : '#111827', marginBottom: 4 }}>{fmt(p.price)}</div>
+              {isSaleActive ? (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 28, fontWeight: 900, color: '#EF4444' }}>{fmt(p.sale_price!)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, background: '#FEE2E2', color: '#EF4444', borderRadius: 6, padding: '2px 8px' }}>{saleRate}% 할인</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#9CA3AF', textDecoration: 'line-through' }}>{fmt(p.price)}</div>
+                  {p.sale_end_at && (
+                    <div style={{ fontSize: 11, color: '#F59E0B', fontWeight: 700, marginTop: 2 }}>
+                      ⏰ {new Date(p.sale_end_at).toLocaleDateString('ko-KR')} 까지
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 900, color: p.price === 0 ? '#10B981' : '#111827', marginBottom: 4 }}>{fmt(p.price)}</div>
+              )}
               <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 16 }}>{isFile ? '1회 다운로드' : '1회 진행 기준'}</div>
               <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
                 {[['별점', rating > 0 ? `★ ${rating.toFixed(1)}` : '-'], ['리뷰', `${p.review_count}개`], [isFile ? '페이지' : '시간', isFile ? (p.page_count ? `${p.page_count}p` : '-') : (p.duration ?? '협의')]].map(([label, val]) => (
@@ -566,7 +593,14 @@ export default function ProgramDetailPage() {
       {/* 모바일 하단 바 */}
       <div className="mobile-buy-bar" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #F0EDE8', padding: '12px 20px 20px', display: 'flex', gap: 10, alignItems: 'center', zIndex: 99 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>{fmt(p.price)}</div>
+          {isSaleActive ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#EF4444' }}>{fmt(p.sale_price!)}</div>
+              <div style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'line-through' }}>{fmt(p.price)}</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#111827' }}>{fmt(p.price)}</div>
+          )}
           {rating > 0 && <div style={{ fontSize: 11, color: '#9CA3AF' }}>★ {rating.toFixed(1)} ({p.review_count})</div>}
         </div>
         {isFile && p.files.some(f => f.is_preview) && (
@@ -592,7 +626,16 @@ export default function ProgramDetailPage() {
                 </div>
                 <div style={{ background: '#F9FAFB', borderRadius: 12, padding: 14, marginBottom: 20 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>{p.title}</div>
-                  <div style={{ fontSize: 13, color: '#9CA3AF', marginTop: 2 }}>{fmt(p.price)}</div>
+                  <div style={{ fontSize: 13, marginTop: 2 }}>
+                    {isSaleActive ? (
+                      <>
+                        <span style={{ color: '#EF4444', fontWeight: 700 }}>{fmt(p.sale_price!)}</span>
+                        <span style={{ color: '#9CA3AF', textDecoration: 'line-through', marginLeft: 6 }}>{fmt(p.price)}</span>
+                      </>
+                    ) : (
+                      <span style={{ color: '#9CA3AF' }}>{fmt(p.price)}</span>
+                    )}
+                  </div>
                   {isFile && <div style={{ fontSize: 12, color: '#0369A1', fontWeight: 700, marginTop: 6 }}>📥 결제 즉시 다운로드 링크 발송</div>}
                 </div>
                 {!isFile && (

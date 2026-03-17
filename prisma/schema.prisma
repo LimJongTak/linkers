@@ -56,6 +56,9 @@ model Program {
   target_levels    String[]
   region           String[]
   price            Int
+  sale_price       Int?
+  sale_start_at    DateTime?
+  sale_end_at      DateTime?
   description      String        @db.Text
   thumbnail_url    String?
   preview_url      String?
@@ -106,6 +109,7 @@ model Order {
   buyer_id       String
   program_id     String
   amount         Int
+  seller_amount  Int         @default(0)
   point_amount   Int         @default(0)
   payment_method String      @default("card")
   status         OrderStatus @default(pending)

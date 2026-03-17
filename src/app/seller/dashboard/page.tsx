@@ -30,6 +30,7 @@ const CATEGORY_ICON: Record<string, string> = {
 
 interface Program {
   id: string; title: string; category: string; price: number
+  salePrice?: number | null; saleStartAt?: string | null; saleEndAt?: string | null; isSaleActive?: boolean
   status: string; ratingAvg: number; reviewCount: number; orderCount: number; revenue: number
   thumbnailUrl?: string | null
 }
@@ -60,15 +61,6 @@ interface Inquiry {
   replies: { id: string }[]
 }
 
-interface Coupon {
-  id: string; code: string; type: string; discountValue: number
-  scope: string; programId?: string | null
-  minPrice: number; maxDiscount?: number | null
-  usageLimit?: number | null; perUserLimit: number; usedCount: number
-  isActive: boolean; expiresAt?: string | null
-  description?: string | null; createdAt: string
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('ko-KR')
 }
@@ -81,10 +73,105 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
+// 세일 설정 인라인 폼
+function SaleForm({
+  program,
+  onSave,
+  onEnd,
+  onCancel,
+}: {
+  program: Program
+  onSave: (salePrice: string, saleStartAt: string, saleEndAt: string) => Promise<void>
+  onEnd: () => Promise<void>
+  onCancel: () => void
+}) {
+  const [salePrice, setSalePrice] = useState(program.salePrice ? String(program.salePrice) : '')
+  const [saleStartAt, setSaleStartAt] = useState(program.saleStartAt ? program.saleStartAt.slice(0, 16) : '')
+  const [saleEndAt, setSaleEndAt] = useState(program.saleEndAt ? program.saleEndAt.slice(0, 16) : '')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setError('')
+    const price = parseInt(salePrice)
+    if (!salePrice || isNaN(price) || price <= 0) { setError('세일가를 입력하세요'); return }
+    if (price >= program.price) { setError(`세일가는 정가(${program.price.toLocaleString()}원)보다 낮아야 합니다`); return }
+    setSaving(true)
+    try {
+      await onSave(salePrice, saleStartAt, saleEndAt)
+    } catch {
+      setError('저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saleRate = salePrice && parseInt(salePrice) > 0 && parseInt(salePrice) < program.price
+    ? Math.round((1 - parseInt(salePrice) / program.price) * 100)
+    : 0
+
+  return (
+    <div style={{ marginTop: 12, background: '#FFF7ED', borderRadius: 12, padding: 16, border: '1px solid #FED7AA' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#92400E', marginBottom: 12 }}>
+        🏷 세일 설정 · 정가 {program.price.toLocaleString()}원
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>
+            세일가 (원) {saleRate > 0 && <span style={{ color: '#EF4444', fontWeight: 800 }}> → {saleRate}% 할인</span>}
+          </label>
+          <input
+            type="number"
+            value={salePrice}
+            onChange={e => setSalePrice(e.target.value)}
+            placeholder={`최대 ${(program.price - 1).toLocaleString()}원`}
+            style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>세일 시작일 (선택)</label>
+          <input
+            type="datetime-local"
+            value={saleStartAt}
+            onChange={e => setSaleStartAt(e.target.value)}
+            style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>세일 종료일 (선택)</label>
+          <input
+            type="datetime-local"
+            value={saleEndAt}
+            onChange={e => setSaleEndAt(e.target.value)}
+            style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+      </div>
+      {error && <div style={{ fontSize: 12, color: '#EF4444', marginBottom: 8 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button onClick={handleSave} disabled={saving}
+          style={{ fontSize: 12, fontWeight: 700, background: '#EF4444', color: '#fff', borderRadius: 7, padding: '6px 14px', border: 'none', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+          {saving ? '저장 중...' : '💾 세일 적용'}
+        </button>
+        {program.salePrice && (
+          <button onClick={onEnd}
+            style={{ fontSize: 12, fontWeight: 700, background: '#F3F4F6', color: '#6B7280', borderRadius: 7, padding: '6px 14px', border: 'none', cursor: 'pointer' }}>
+            세일 종료
+          </button>
+        )}
+        <button onClick={onCancel}
+          style={{ fontSize: 12, fontWeight: 600, background: 'none', color: '#9CA3AF', borderRadius: 7, padding: '6px 10px', border: 'none', cursor: 'pointer' }}>
+          취소
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function SellerDashboardPage() {
   const { user, accessToken } = useAuth()
   const router = useRouter()
-  const [tab, setTab] = useState<'overview' | 'programs' | 'orders' | 'settlements' | 'reviews' | 'inquiries' | 'coupons'>('overview')
+  const [tab, setTab] = useState<'overview' | 'programs' | 'orders' | 'settlements' | 'reviews' | 'inquiries'>('overview')
   const [programs, setPrograms] = useState<Program[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -104,22 +191,22 @@ export default function SellerDashboardPage() {
   const [replyContent, setReplyContent] = useState('')
   const [replyLoading, setReplyLoading] = useState(false)
 
-  // Coupons
-  const [coupons, setCoupons] = useState<Coupon[]>([])
-  const [couponsLoaded, setCouponsLoaded] = useState(false)
-  const [couponForm, setCouponForm] = useState({
-    type: 'fixed', discountValue: '', scope: 'seller', programId: '',
-    minPrice: '', maxDiscount: '', usageLimit: '', perUserLimit: '1',
-    expiresAt: '', description: '',
-  })
-  const [couponError, setCouponError] = useState('')
-  const [couponLoading, setCouponLoading] = useState(false)
-  const [showCouponForm, setShowCouponForm] = useState(false)
+  // Sale form
+  const [saleFormOpen, setSaleFormOpen] = useState<string | null>(null)
 
   const authHeaders = useCallback(() => ({
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   }), [accessToken])
+
+  const refreshPrograms = useCallback(async () => {
+    if (!accessToken) return
+    const r = await fetch('/api/seller/stats', { headers: { Authorization: `Bearer ${accessToken}` } })
+    const d = await r.json()
+    setPrograms(d.programs ?? [])
+    setOrders(d.orders ?? [])
+    setStats(d.stats ?? null)
+  }, [accessToken])
 
   const programAction = async (id: string, method: string, body?: object) => {
     if (!accessToken) return
@@ -130,14 +217,30 @@ export default function SellerDashboardPage() {
         headers: authHeaders(),
         ...(body ? { body: JSON.stringify(body) } : {}),
       })
-      const r = await fetch('/api/seller/stats', { headers: { Authorization: `Bearer ${accessToken}` } })
-      const d = await r.json()
-      setPrograms(d.programs ?? [])
-      setOrders(d.orders ?? [])
-      setStats(d.stats ?? null)
+      await refreshPrograms()
     } finally {
       setActionLoading(null)
     }
+  }
+
+  const handleSetSale = async (programId: string, salePrice: string, saleStartAt: string, saleEndAt: string) => {
+    await fetch(`/api/seller/programs/${programId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ action: 'set_sale', salePrice, saleStartAt: saleStartAt || null, saleEndAt: saleEndAt || null }),
+    })
+    setSaleFormOpen(null)
+    await refreshPrograms()
+  }
+
+  const handleEndSale = async (programId: string) => {
+    await fetch(`/api/seller/programs/${programId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ action: 'end_sale' }),
+    })
+    setSaleFormOpen(null)
+    await refreshPrograms()
   }
 
   useEffect(() => {
@@ -179,13 +282,7 @@ export default function SellerDashboardPage() {
         .then(d => { setInquiries(d.inquiries ?? []); setInquiriesLoaded(true) })
         .catch(() => setInquiriesLoaded(true))
     }
-    if (tab === 'coupons' && !couponsLoaded && accessToken) {
-      fetch('/api/seller/coupons', { headers: { Authorization: `Bearer ${accessToken}` } })
-        .then(r => r.json())
-        .then(d => { setCoupons(d.coupons ?? []); setCouponsLoaded(true) })
-        .catch(() => setCouponsLoaded(true))
-    }
-  }, [tab, reviewsLoaded, inquiriesLoaded, couponsLoaded, accessToken])
+  }, [tab, reviewsLoaded, inquiriesLoaded, accessToken])
 
   const handleReply = async (inquiryId: string) => {
     if (!replyContent.trim() || !accessToken) return
@@ -199,7 +296,6 @@ export default function SellerDashboardPage() {
       if (r.ok) {
         setReplyOpen(null)
         setReplyContent('')
-        // refresh inquiries
         const d = await fetch('/api/inquiries?type=seller&target=received', {
           headers: { Authorization: `Bearer ${accessToken}` },
         }).then(x => x.json())
@@ -207,30 +303,6 @@ export default function SellerDashboardPage() {
       }
     } finally {
       setReplyLoading(false)
-    }
-  }
-
-  const handleCouponSubmit = async () => {
-    setCouponError('')
-    if (!couponForm.discountValue) { setCouponError('할인값을 입력하세요'); return }
-    setCouponLoading(true)
-    try {
-      const r = await fetch('/api/seller/coupons', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify(couponForm),
-      })
-      const d = await r.json()
-      if (!r.ok) { setCouponError(d.message ?? '생성 실패'); return }
-      setCoupons(prev => [{ ...d.coupon, usedCount: 0 }, ...prev])
-      setShowCouponForm(false)
-      setCouponForm({
-        type: 'fixed', discountValue: '', scope: 'seller', programId: '',
-        minPrice: '', maxDiscount: '', usageLimit: '', perUserLimit: '1',
-        expiresAt: '', description: '',
-      })
-    } finally {
-      setCouponLoading(false)
     }
   }
 
@@ -249,7 +321,6 @@ export default function SellerDashboardPage() {
     ['orders', '주문 내역'],
     ['reviews', '리뷰'],
     ['inquiries', '문의 관리'],
-    ['coupons', '쿠폰'],
     ['settlements', '정산'],
   ] as const
 
@@ -268,7 +339,7 @@ export default function SellerDashboardPage() {
           .settle-grid{grid-template-columns:1fr!important;}
           .recent-order-row{flex-direction:column;align-items:flex-start!important;gap:8px!important;}
           .recent-order-right{width:100%;display:flex;justify-content:space-between;align-items:center;}
-          .coupon-grid{grid-template-columns:1fr!important;}
+          .sale-grid{grid-template-columns:1fr!important;}
         }
       `}</style>
       <Header />
@@ -385,51 +456,81 @@ export default function SellerDashboardPage() {
             {programs.map(p => {
               const s = STATUS_STYLE[p.status] ?? STATUS_STYLE['draft']
               const icon = CATEGORY_ICON[p.category] ?? '📦'
+              const isSaleOpen = saleFormOpen === p.id
+              const saleRate = p.isSaleActive && p.salePrice ? Math.round((1 - p.salePrice / p.price) * 100) : 0
               return (
-                <div key={p.id} style={{ background: '#fff', borderRadius: 18, padding: 20, border: '1px solid #F0EDE8', marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {p.thumbnailUrl ? (
-                      <img src={p.thumbnailUrl} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: 26 }}>{icon}</span>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <Link href={`/programs/${p.id}`} style={{ fontSize: 15, fontWeight: 800, color: '#111827', textDecoration: 'none' }}>{p.title}</Link>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: s.bg, color: s.color }}>{s.label}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#9CA3AF' }}>
-                      주문 {p.orderCount}건 · 수익 {p.revenue.toLocaleString()}원
-                      {p.reviewCount > 0 && ` · ★${p.ratingAvg.toFixed(1)} (${p.reviewCount})`}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#111827' }}>{p.price.toLocaleString()}원</div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <Link href={`/seller/programs/${p.id}/files`} style={{ fontSize: 11, fontWeight: 700, background: '#F0F9FF', color: '#0369A1', borderRadius: 6, padding: '3px 8px', textDecoration: 'none' }}>
-                        📁 파일 관리
-                      </Link>
-                      {p.status === 'active' && (
-                        <button onClick={() => programAction(p.id, 'PATCH', { status: 'paused' })} disabled={actionLoading === p.id}
-                          style={{ fontSize: 11, fontWeight: 700, background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
-                          ⏸ 일시중지
-                        </button>
-                      )}
-                      {p.status === 'paused' && (
-                        <button onClick={() => programAction(p.id, 'PATCH', { status: 'active' })} disabled={actionLoading === p.id}
-                          style={{ fontSize: 11, fontWeight: 700, background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
-                          ▶ 재개
-                        </button>
-                      )}
-                      {p.status !== 'deleted' && (
-                        <button onClick={() => { if (confirm('정말 삭제하시겠습니까?')) programAction(p.id, 'DELETE') }} disabled={actionLoading === p.id}
-                          style={{ fontSize: 11, fontWeight: 700, background: '#FEE2E2', color: '#991B1B', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
-                          🗑 삭제
-                        </button>
+                <div key={p.id} style={{ background: '#fff', borderRadius: 18, padding: 20, border: '1px solid #F0EDE8', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {p.thumbnailUrl ? (
+                        <img src={p.thumbnailUrl} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: 26 }}>{icon}</span>
                       )}
                     </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+                        <Link href={`/programs/${p.id}`} style={{ fontSize: 15, fontWeight: 800, color: '#111827', textDecoration: 'none' }}>{p.title}</Link>
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: s.bg, color: s.color }}>{s.label}</span>
+                        {p.isSaleActive && (
+                          <span style={{ fontSize: 10, fontWeight: 900, background: '#FEE2E2', color: '#EF4444', borderRadius: 5, padding: '2px 8px' }}>
+                            SALE {saleRate}%
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                        {p.isSaleActive && p.salePrice
+                          ? <><span style={{ color: '#EF4444', fontWeight: 700 }}>{p.salePrice.toLocaleString()}원</span> <span style={{ textDecoration: 'line-through' }}>{p.price.toLocaleString()}원</span></>
+                          : <span>{p.price.toLocaleString()}원</span>
+                        }
+                        {' · '}주문 {p.orderCount}건 · 수익 {p.revenue.toLocaleString()}원
+                        {p.reviewCount > 0 && ` · ★${p.ratingAvg.toFixed(1)} (${p.reviewCount})`}
+                      </div>
+                      {p.saleEndAt && p.isSaleActive && (
+                        <div style={{ fontSize: 11, color: '#F59E0B', fontWeight: 700, marginTop: 2 }}>
+                          ⏰ {formatDate(p.saleEndAt)} 까지
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <Link href={`/seller/programs/${p.id}/files`} style={{ fontSize: 11, fontWeight: 700, background: '#F0F9FF', color: '#0369A1', borderRadius: 6, padding: '3px 8px', textDecoration: 'none' }}>
+                          📁 파일 관리
+                        </Link>
+                        <button
+                          onClick={() => setSaleFormOpen(isSaleOpen ? null : p.id)}
+                          style={{ fontSize: 11, fontWeight: 700, background: p.isSaleActive ? '#FEE2E2' : '#FFF7ED', color: p.isSaleActive ? '#EF4444' : '#D97706', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
+                          🏷 {p.isSaleActive ? '세일 수정' : '세일 설정'}
+                        </button>
+                        {p.status === 'active' && (
+                          <button onClick={() => programAction(p.id, 'PATCH', { status: 'paused' })} disabled={actionLoading === p.id}
+                            style={{ fontSize: 11, fontWeight: 700, background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
+                            ⏸ 일시중지
+                          </button>
+                        )}
+                        {p.status === 'paused' && (
+                          <button onClick={() => programAction(p.id, 'PATCH', { status: 'active' })} disabled={actionLoading === p.id}
+                            style={{ fontSize: 11, fontWeight: 700, background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
+                            ▶ 재개
+                          </button>
+                        )}
+                        {p.status !== 'deleted' && (
+                          <button onClick={() => { if (confirm('정말 삭제하시겠습니까?')) programAction(p.id, 'DELETE') }} disabled={actionLoading === p.id}
+                            style={{ fontSize: 11, fontWeight: 700, background: '#FEE2E2', color: '#991B1B', borderRadius: 6, padding: '3px 8px', border: 'none', cursor: 'pointer' }}>
+                            🗑 삭제
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  {isSaleOpen && (
+                    <SaleForm
+                      program={p}
+                      onSave={(salePrice, saleStartAt, saleEndAt) => handleSetSale(p.id, salePrice, saleStartAt, saleEndAt)}
+                      onEnd={() => handleEndSale(p.id)}
+                      onCancel={() => setSaleFormOpen(null)}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -583,145 +684,12 @@ export default function SellerDashboardPage() {
           </div>
         )}
 
-        {/* ── 쿠폰 ── */}
-        {!loading && tab === 'coupons' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-              <button onClick={() => setShowCouponForm(v => !v)}
-                style={{ background: '#111827', color: '#fff', borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                {showCouponForm ? '✕ 닫기' : '+ 쿠폰 만들기'}
-              </button>
-            </div>
-
-            {showCouponForm && (
-              <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: '1px solid #F0EDE8', marginBottom: 20 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827', marginBottom: 16 }}>새 쿠폰 만들기</h3>
-                <div className="coupon-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>할인 유형</label>
-                    <select value={couponForm.type} onChange={e => setCouponForm(f => ({ ...f, type: e.target.value }))}
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }}>
-                      <option value="fixed">정액 할인</option>
-                      <option value="percent">비율 할인 (%)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>
-                      할인값 {couponForm.type === 'fixed' ? '(원)' : '(%)'}
-                    </label>
-                    <input type="number" value={couponForm.discountValue} onChange={e => setCouponForm(f => ({ ...f, discountValue: e.target.value }))}
-                      placeholder={couponForm.type === 'fixed' ? '예: 5000' : '예: 10'}
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>적용 범위</label>
-                    <select value={couponForm.scope} onChange={e => setCouponForm(f => ({ ...f, scope: e.target.value }))}
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }}>
-                      <option value="seller">내 모든 프로그램</option>
-                      <option value="program">특정 프로그램</option>
-                    </select>
-                  </div>
-                  {couponForm.scope === 'program' && (
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>프로그램 선택</label>
-                      <select value={couponForm.programId} onChange={e => setCouponForm(f => ({ ...f, programId: e.target.value }))}
-                        style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }}>
-                        <option value="">선택하세요</option>
-                        {programs.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>최소 주문금액 (원, 선택)</label>
-                    <input type="number" value={couponForm.minPrice} onChange={e => setCouponForm(f => ({ ...f, minPrice: e.target.value }))}
-                      placeholder="예: 10000"
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                  {couponForm.type === 'percent' && (
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>최대 할인금액 (원, 선택)</label>
-                      <input type="number" value={couponForm.maxDiscount} onChange={e => setCouponForm(f => ({ ...f, maxDiscount: e.target.value }))}
-                        placeholder="예: 10000"
-                        style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                    </div>
-                  )}
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>총 사용 한도 (선택)</label>
-                    <input type="number" value={couponForm.usageLimit} onChange={e => setCouponForm(f => ({ ...f, usageLimit: e.target.value }))}
-                      placeholder="비워두면 무제한"
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>인당 사용 횟수</label>
-                    <input type="number" value={couponForm.perUserLimit} onChange={e => setCouponForm(f => ({ ...f, perUserLimit: e.target.value }))}
-                      min={1}
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>만료일 (선택)</label>
-                    <input type="date" value={couponForm.expiresAt} onChange={e => setCouponForm(f => ({ ...f, expiresAt: e.target.value }))}
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>쿠폰 설명 (선택)</label>
-                    <input type="text" value={couponForm.description} onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))}
-                      placeholder="예: 신규 가입 감사 쿠폰"
-                      style={{ width: '100%', borderRadius: 8, border: '1px solid #E5E7EB', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                </div>
-                {couponError && <div style={{ color: '#EF4444', fontSize: 13, marginTop: 10 }}>{couponError}</div>}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-                  <button onClick={handleCouponSubmit} disabled={couponLoading}
-                    style={{ background: '#111827', color: '#fff', borderRadius: 10, padding: '10px 24px', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: couponLoading ? 0.6 : 1 }}>
-                    {couponLoading ? '생성 중...' : '쿠폰 생성'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!couponsLoaded && <div style={{ textAlign: 'center', padding: '40px 0', color: '#9CA3AF' }}>불러오는 중...</div>}
-            {couponsLoaded && coupons.length === 0 && !showCouponForm && (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#9CA3AF' }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🎟</div>
-                <div>생성된 쿠폰이 없습니다</div>
-              </div>
-            )}
-            {coupons.map(c => (
-              <div key={c.id} style={{ background: '#fff', borderRadius: 14, padding: '16px 20px', border: '1px solid #F0EDE8', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 900, color: '#111827', fontFamily: 'monospace', background: '#F3F4F6', padding: '2px 8px', borderRadius: 6 }}>{c.code}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, background: c.isActive ? '#D1FAE5' : '#F3F4F6', color: c.isActive ? '#065F46' : '#6B7280', borderRadius: 5, padding: '2px 7px' }}>
-                      {c.isActive ? '활성' : '비활성'}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{c.scope === 'program' ? '특정 프로그램' : '내 전체 상품'}</span>
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginBottom: 2 }}>
-                    {c.type === 'fixed' ? `${c.discountValue.toLocaleString()}원 할인` : `${c.discountValue}% 할인`}
-                    {c.maxDiscount && ` (최대 ${c.maxDiscount.toLocaleString()}원)`}
-                    {c.minPrice > 0 && <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 500 }}> · {c.minPrice.toLocaleString()}원 이상 구매 시</span>}
-                  </div>
-                  {c.description && <div style={{ fontSize: 12, color: '#6B7280' }}>{c.description}</div>}
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
-                    {c.usedCount}{c.usageLimit ? `/${c.usageLimit}` : ''} 사용
-                  </div>
-                  {c.expiresAt && (
-                    <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
-                      ~{formatDate(c.expiresAt)}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>인당 {c.perUserLimit}회</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ── 정산 ── */}
         {!loading && tab === 'settlements' && stats && (
           <div>
+            <div style={{ background: '#DBEAFE', borderRadius: 12, padding: '14px 16px', fontSize: 13, color: '#1E40AF', fontWeight: 600, marginBottom: 16 }}>
+              ℹ️ 수익 금액은 <strong>쿠폰 할인 전 세일가(또는 정가)</strong> 기준입니다. 관리자 발급 쿠폰 할인분은 플랫폼이 부담합니다.
+            </div>
             <div className="settle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
               {[
                 ['정산 예정', `₩${Math.floor(stats.monthRevenue * 0.9).toLocaleString()}`, '이번달 말 (수수료 10% 제외)'],

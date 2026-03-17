@@ -16,7 +16,6 @@ export async function DELETE(
     if (program.seller_id !== user.userId) throw new ApiError(403, 'FORBIDDEN')
     if (program.status === 'deleted') throw new ApiError(400, '이미 삭제된 프로그램입니다')
 
-    // 진행 중인 결제 주문이 있으면 삭제 불가
     const pendingOrders = await db.order.count({
       where: { program_id: id, status: 'pending' },
     })
@@ -33,7 +32,7 @@ export async function DELETE(
   }
 }
 
-// 판매자 프로그램 상태 변경 (일시중지/재개)
+// 판매자 프로그램 상태/세일 변경
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -41,18 +40,52 @@ export async function PATCH(
   try {
     const { id } = await params
     const user = verifyAccessToken(req)
-    const { status } = await req.json()
+    const body = await req.json()
 
     const program = await db.program.findUnique({ where: { id } })
     if (!program) throw new ApiError(404, 'PROGRAM_NOT_FOUND')
     if (program.seller_id !== user.userId) throw new ApiError(403, 'FORBIDDEN')
 
-    const allowed = ['paused', 'active']
-    if (!allowed.includes(status)) throw new ApiError(400, '허용되지 않는 상태값입니다')
-    if (program.status === 'draft') throw new ApiError(400, '검수 중인 프로그램은 상태를 변경할 수 없습니다')
+    // 상태 변경
+    if (body.status !== undefined) {
+      const allowed = ['paused', 'active']
+      if (!allowed.includes(body.status)) throw new ApiError(400, '허용되지 않는 상태값입니다')
+      if (program.status === 'draft') throw new ApiError(400, '검수 중인 프로그램은 상태를 변경할 수 없습니다')
+      await db.program.update({ where: { id }, data: { status: body.status } })
+      return Response.json({ success: true })
+    }
 
-    await db.program.update({ where: { id }, data: { status } })
-    return Response.json({ success: true })
+    // 세일 설정
+    if (body.action === 'set_sale') {
+      const { salePrice, saleStartAt, saleEndAt } = body
+
+      if (salePrice !== null && salePrice !== undefined) {
+        const price = parseInt(salePrice)
+        if (isNaN(price) || price <= 0) throw new ApiError(400, '세일가는 0보다 커야 합니다')
+        if (price >= program.price) throw new ApiError(400, '세일가는 정가보다 낮아야 합니다')
+      }
+
+      await db.program.update({
+        where: { id },
+        data: {
+          sale_price: salePrice ? parseInt(salePrice) : null,
+          sale_start_at: saleStartAt ? new Date(saleStartAt) : null,
+          sale_end_at: saleEndAt ? new Date(saleEndAt) : null,
+        },
+      })
+      return Response.json({ success: true })
+    }
+
+    // 세일 종료 (즉시)
+    if (body.action === 'end_sale') {
+      await db.program.update({
+        where: { id },
+        data: { sale_price: null, sale_start_at: null, sale_end_at: null },
+      })
+      return Response.json({ success: true })
+    }
+
+    throw new ApiError(400, '처리할 수 없는 요청입니다')
   } catch (err) {
     return handleError(err)
   }

@@ -14,8 +14,13 @@ export async function GET(req: NextRequest) {
         where: { seller_id: user.userId },
         select: {
           id: true, title: true, category: true, price: true, status: true,
+          sale_price: true, sale_start_at: true, sale_end_at: true,
           rating_avg: true, review_count: true, thumbnail_url: true,
           _count: { select: { orders: true } },
+          orders: {
+            where: { status: { in: ['paid', 'confirmed'] } },
+            select: { seller_amount: true, amount: true },
+          },
         },
         orderBy: { created_at: 'desc' },
       }),
@@ -24,7 +29,9 @@ export async function GET(req: NextRequest) {
           program: { seller_id: user.userId },
           status: { in: ['paid', 'confirmed'] },
         },
-        include: {
+        select: {
+          id: true, order_number: true, amount: true, seller_amount: true,
+          status: true, created_at: true,
           buyer: { select: { nickname: true } },
           program: { select: { id: true, title: true } },
         },
@@ -38,23 +45,37 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    const totalRevenue = orders.reduce((s, o) => s + o.amount, 0)
+    // seller_amount: 세일가 적용된 판매자 기준 금액 (쿠폰 할인 전)
+    const totalRevenue = orders.reduce((s, o) => s + (o.seller_amount || o.amount), 0)
     const monthOrders = orders.filter(o => new Date(o.created_at) >= monthStart)
-    const monthRevenue = monthOrders.reduce((s, o) => s + o.amount, 0)
+    const monthRevenue = monthOrders.reduce((s, o) => s + (o.seller_amount || o.amount), 0)
 
     return Response.json({
-      programs: programs.map(p => ({
-        id: p.id,
-        title: p.title,
-        category: p.category,
-        price: p.price,
-        status: p.status,
-        ratingAvg: p.rating_avg,
-        reviewCount: p.review_count,
-        orderCount: p._count.orders,
-        revenue: p._count.orders * p.price,
-        thumbnailUrl: p.thumbnail_url,
-      })),
+      programs: programs.map(p => {
+        const now = new Date()
+        const isSaleActive = !!(
+          p.sale_price && p.sale_price > 0 && p.sale_price < p.price &&
+          (!p.sale_start_at || p.sale_start_at <= now) &&
+          (!p.sale_end_at || p.sale_end_at >= now)
+        )
+        const revenue = p.orders.reduce((s: number, o: { seller_amount: number; amount: number }) => s + (o.seller_amount || o.amount), 0)
+        return {
+          id: p.id,
+          title: p.title,
+          category: p.category,
+          price: p.price,
+          salePrice: p.sale_price,
+          saleStartAt: p.sale_start_at,
+          saleEndAt: p.sale_end_at,
+          isSaleActive,
+          status: p.status,
+          ratingAvg: p.rating_avg,
+          reviewCount: p.review_count,
+          orderCount: p._count.orders,
+          revenue,
+          thumbnailUrl: p.thumbnail_url,
+        }
+      }),
       orders: orders.map(o => ({
         id: o.id,
         orderNumber: o.order_number,

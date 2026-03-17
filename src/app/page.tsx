@@ -21,6 +21,9 @@ interface DBProgram {
   target_levels: string[]
   region: string[]
   price: number
+  sale_price: number | null
+  sale_start_at: string | null
+  sale_end_at: string | null
   file_format: string | null
   page_count: number | null
   duration: string | null
@@ -353,6 +356,14 @@ function PCard({ p, purchased, wishlisted, onToggleWishlist }: {
 }) {
   const isFile = p.product_type === 'file_product'
   const rating = parseFloat(p.rating_avg) || 0
+  const now = new Date()
+  const isSaleActive = !!(
+    p.sale_price && p.sale_price > 0 && p.sale_price < p.price &&
+    (!p.sale_start_at || new Date(p.sale_start_at) <= now) &&
+    (!p.sale_end_at || new Date(p.sale_end_at) >= now)
+  )
+  const displayPrice = isSaleActive ? p.sale_price! : p.price
+  const saleRate = isSaleActive ? Math.round((1 - p.sale_price! / p.price) * 100) : 0
 
   return (
     <Link href={purchased ? '/my/orders' : `/programs/${p.id}`} className="card" style={{ position: 'relative' }}>
@@ -396,6 +407,11 @@ function PCard({ p, purchased, wishlisted, onToggleWishlist }: {
         <span style={{ position: 'absolute', top: 10, right: 10, background: isFile ? 'rgba(3,105,161,0.88)' : 'rgba(91,33,182,0.88)', color: '#fff', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 5, backdropFilter: 'blur(6px)' }}>
           {isFile ? '📄 파일' : '🎓 강의'}
         </span>
+        {isSaleActive && (
+          <span style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(239,68,68,0.92)', color: '#fff', fontSize: 10, fontWeight: 900, padding: '3px 8px', borderRadius: 5, backdropFilter: 'blur(6px)' }}>
+            SALE {saleRate}%
+          </span>
+        )}
       </div>
       <div style={{ padding: '16px 16px 0', flex: 1 }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', lineHeight: 1.35, marginBottom: 4 }}>{p.title}</div>
@@ -422,8 +438,17 @@ function PCard({ p, purchased, wishlisted, onToggleWishlist }: {
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
-            <span style={{ fontSize: 17, fontWeight: 900, color: p.price === 0 ? '#10B981' : '#111827' }}>{fmt(p.price)}</span>
-            {p.price > 0 && <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 3 }}>{isFile ? '/ 다운로드' : '/ 1회'}</span>}
+            {isSaleActive ? (
+              <>
+                <span style={{ fontSize: 17, fontWeight: 900, color: '#EF4444' }}>{fmt(displayPrice)}</span>
+                <span style={{ fontSize: 11, color: '#9CA3AF', textDecoration: 'line-through', marginLeft: 5 }}>{fmt(p.price)}</span>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 17, fontWeight: 900, color: p.price === 0 ? '#10B981' : '#111827' }}>{fmt(p.price)}</span>
+                {p.price > 0 && <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 3 }}>{isFile ? '/ 다운로드' : '/ 1회'}</span>}
+              </>
+            )}
           </div>
           {rating > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
