@@ -126,7 +126,99 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       if (target.oauth_provider !== 'deleted') {
         throw new ApiError(400, '탈퇴 처리된 회원만 완전 삭제할 수 있습니다')
       }
-      await db.user.delete({ where: { id } })
+
+      await db.$transaction(async (tx) => {
+        // 연관 ID 수집
+        const orderIds = (await tx.order.findMany({ where: { buyer_id: id }, select: { id: true } })).map(o => o.id)
+        const programIds = (await tx.program.findMany({ where: { seller_id: id }, select: { id: true } })).map(p => p.id)
+        const programOrderIds = programIds.length > 0
+          ? (await tx.order.findMany({ where: { program_id: { in: programIds } }, select: { id: true } })).map(o => o.id)
+          : []
+        const allOrderIds = [...new Set([...orderIds, ...programOrderIds])]
+
+        const permissionIds = (await tx.downloadPermission.findMany({ where: { buyer_id: id }, select: { id: true } })).map(p => p.id)
+        const programFileIds = programIds.length > 0
+          ? (await tx.programFile.findMany({ where: { program_id: { in: programIds } }, select: { id: true } })).map(f => f.id)
+          : []
+        const programPermissionIds = programFileIds.length > 0
+          ? (await tx.downloadPermission.findMany({ where: { program_file_id: { in: programFileIds } }, select: { id: true } })).map(p => p.id)
+          : []
+        const allPermissionIds = [...new Set([...permissionIds, ...programPermissionIds])]
+
+        const userInquiryIds = (await tx.inquiry.findMany({ where: { user_id: id }, select: { id: true } })).map(i => i.id)
+        const programInquiryIds = programIds.length > 0
+          ? (await tx.inquiry.findMany({ where: { program_id: { in: programIds } }, select: { id: true } })).map(i => i.id)
+          : []
+        const allInquiryIds = [...new Set([...userInquiryIds, ...programInquiryIds])]
+
+        const createdCouponIds = (await tx.coupon.findMany({ where: { created_by: id }, select: { id: true } })).map(c => c.id)
+        const programCouponIds = programIds.length > 0
+          ? (await tx.coupon.findMany({ where: { program_id: { in: programIds } }, select: { id: true } })).map(c => c.id)
+          : []
+        const allCouponIds = [...new Set([...createdCouponIds, ...programCouponIds])]
+
+        // 1. SignedUrlLog
+        if (allPermissionIds.length > 0) await tx.signedUrlLog.deleteMany({ where: { permission_id: { in: allPermissionIds } } })
+
+        // 2. DownloadPermission
+        if (allPermissionIds.length > 0) await tx.downloadPermission.deleteMany({ where: { id: { in: allPermissionIds } } })
+
+        // 3. CouponUsage
+        if (allCouponIds.length > 0) await tx.couponUsage.deleteMany({ where: { coupon_id: { in: allCouponIds } } })
+        if (allOrderIds.length > 0) await tx.couponUsage.deleteMany({ where: { order_id: { in: allOrderIds } } })
+        await tx.couponUsage.deleteMany({ where: { user_id: id } })
+
+        // 4. Review
+        if (allOrderIds.length > 0) await tx.review.deleteMany({ where: { order_id: { in: allOrderIds } } })
+
+        // 5. Payment
+        if (allOrderIds.length > 0) await tx.payment.deleteMany({ where: { order_id: { in: allOrderIds } } })
+
+        // 6. Settlement
+        await tx.settlement.deleteMany({ where: { seller_id: id } })
+        if (allOrderIds.length > 0) await tx.settlement.deleteMany({ where: { order_id: { in: allOrderIds } } })
+
+        // 7. Order
+        if (allOrderIds.length > 0) await tx.order.deleteMany({ where: { id: { in: allOrderIds } } })
+
+        // 8. PointTransaction
+        await tx.pointTransaction.deleteMany({ where: { user_id: id } })
+
+        // 9. Withdrawal
+        await tx.withdrawal.deleteMany({ where: { seller_id: id } })
+
+        // 10. InquiryReply
+        await tx.inquiryReply.deleteMany({ where: { author_id: id } })
+        if (allInquiryIds.length > 0) await tx.inquiryReply.deleteMany({ where: { inquiry_id: { in: allInquiryIds } } })
+
+        // 11. Inquiry
+        await tx.inquiry.deleteMany({ where: { user_id: id } })
+        if (programIds.length > 0) await tx.inquiry.deleteMany({ where: { program_id: { in: programIds } } })
+
+        // 12. Notice
+        await tx.notice.deleteMany({ where: { author_id: id } })
+
+        // 13. Report
+        await tx.report.deleteMany({ where: { reporter_id: id } })
+        await tx.report.updateMany({ where: { reviewer_id: id }, data: { reviewer_id: null } })
+
+        // 14. UserCoupon, Coupon
+        if (allCouponIds.length > 0) {
+          await tx.userCoupon.deleteMany({ where: { coupon_id: { in: allCouponIds } } })
+          await tx.coupon.deleteMany({ where: { id: { in: allCouponIds } } })
+        }
+        await tx.userCoupon.deleteMany({ where: { user_id: id } })
+
+        // 15. DepositRequest
+        await tx.depositRequest.deleteMany({ where: { user_id: id } })
+
+        // 16. Program (cascade → ProgramFile, Wishlist, CartItem, Report)
+        if (programIds.length > 0) await tx.program.deleteMany({ where: { id: { in: programIds } } })
+
+        // 17. User
+        await tx.user.delete({ where: { id } })
+      })
+
       return Response.json({ success: true, deleted: true })
     }
 
