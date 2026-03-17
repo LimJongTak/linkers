@@ -16,6 +16,7 @@ interface AuthCtx {
   accessToken: string | null
   login: (token: string, user: AuthUser) => void
   logout: () => void
+  updateUser: (patch: Partial<AuthUser>) => void
   isLoading: boolean
 }
 
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthCtx>({
   accessToken: null,
   login: () => {},
   logout: () => {},
+  updateUser: () => {},
   isLoading: true,
 })
 
@@ -56,6 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(token)
     sessionStorage.setItem('linkers_user', JSON.stringify(u))
     sessionStorage.setItem('linkers_at', token)
+  }
+
+  const updateUser = (patch: Partial<AuthUser>) => {
+    setUser(prev => {
+      if (!prev) return prev
+      const updated = { ...prev, ...patch }
+      sessionStorage.setItem('linkers_user', JSON.stringify(updated))
+      return updated
+    })
   }
 
   // 초기 로드
@@ -107,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return createElement(
     AuthContext.Provider,
-    { value: { user, accessToken, login, logout, isLoading } },
+    { value: { user, accessToken, login, logout, updateUser, isLoading } },
     children
   )
 }

@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     requireRole(admin, 'admin', 'manager')
 
     const { id } = await params
-    const { action, role, points, reason } = await req.json()
+    const { action, role, points, reason, nickname, phone, email } = await req.json()
 
     const target = await db.user.findUnique({ where: { id } })
     if (!target) throw new ApiError(404, 'USER_NOT_FOUND')
@@ -75,6 +75,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           },
         },
         select: { id: true, nickname: true, points: true },
+      })
+      return Response.json({ user: updated })
+    }
+
+    if (action === 'update_profile') {
+      const data: Record<string, string | null> = {}
+      if (nickname !== undefined) {
+        if (typeof nickname !== 'string' || nickname.trim().length < 2) throw new ApiError(400, '닉네임은 2자 이상이어야 합니다')
+        data.nickname = nickname.trim()
+      }
+      if (phone !== undefined) data.phone = phone || null
+      if (email !== undefined) {
+        if (admin.role !== 'admin') throw new ApiError(403, '이메일 변경은 관리자만 가능합니다')
+        data.email = email || null
+      }
+      if (Object.keys(data).length === 0) throw new ApiError(400, '변경할 항목이 없습니다')
+      const updated = await db.user.update({
+        where: { id },
+        data,
+        select: { id: true, nickname: true, email: true, phone: true, role: true },
       })
       return Response.json({ user: updated })
     }

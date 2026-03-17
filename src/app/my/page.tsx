@@ -58,8 +58,13 @@ export default function MyPage() {
               {user.role === 'admin' ? '관리자 계정' : user.role === 'manager' ? '매니저 계정' : '구매 · 판매 계정'}
             </div>
           </div>
-          <div style={{ background: 'rgba(79,195,247,0.2)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 8, flexShrink: 0 }}>
-            {user.role === 'admin' ? 'ADMIN' : user.role === 'manager' ? 'MANAGER' : '회원'}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+            <div style={{ background: 'rgba(79,195,247,0.2)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 8 }}>
+              {user.role === 'admin' ? 'ADMIN' : user.role === 'manager' ? 'MANAGER' : '회원'}
+            </div>
+            <Link href="/my/profile" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6, textDecoration: 'none' }}>
+              프로필 수정
+            </Link>
           </div>
         </div>
 

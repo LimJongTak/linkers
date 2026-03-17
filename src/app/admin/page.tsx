@@ -181,9 +181,12 @@ function UsersTab({ token }: { token: string | null }) {
   const { show, Toast } = useToast()
   const url = `/api/admin/users?page=${page}&search=${query}&role=${roleFilter}`
   const { data, loading, reload } = useAdminFetch<any>(url, token, [page, query, roleFilter])
-  const [modal, setModal] = useState<{ userId: string; nickname: string; currentPoints?: number; action: 'grant_points' | 'deduct_points' | 'change_role' } | null>(null)
+  const [modal, setModal] = useState<{ userId: string; nickname: string; currentPoints?: number; action: 'grant_points' | 'deduct_points' | 'change_role' | 'update_profile'; email?: string; phone?: string } | null>(null)
   const [modalVal, setModalVal] = useState('')
   const [modalReason, setModalReason] = useState('')
+  const [profileNickname, setProfileNickname] = useState('')
+  const [profilePhone, setProfilePhone] = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
   const [modalLoading, setModalLoading] = useState(false)
   const [modalError, setModalError] = useState('')
 
@@ -204,6 +207,7 @@ function UsersTab({ token }: { token: string | null }) {
   }
 
   const isPointsAction = modal?.action === 'grant_points' || modal?.action === 'deduct_points'
+  const isProfileAction = modal?.action === 'update_profile'
 
   return (
     <>
@@ -258,6 +262,8 @@ function UsersTab({ token }: { token: string | null }) {
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>P 회수</button>
                         <button onClick={() => { setModal({ userId: u.id, nickname: u.nickname, action: 'change_role' }); setModalVal(u.role) }}
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#DBEAFE', color: '#1D4ED8', cursor: 'pointer', fontFamily: 'inherit' }}>역할</button>
+                        <button onClick={() => { setModal({ userId: u.id, nickname: u.nickname, action: 'update_profile', email: u.email, phone: u.phone }); setProfileNickname(u.nickname); setProfilePhone(u.phone ?? ''); setProfileEmail(u.email ?? '') }}
+                          style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#F0FDF4', color: '#15803D', cursor: 'pointer', fontFamily: 'inherit' }}>프로필</button>
                       </div>
                     </td>
                   </tr>
@@ -272,7 +278,7 @@ function UsersTab({ token }: { token: string | null }) {
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => { setModal(null); setModalError('') }} />
           <div style={{ position: 'relative', background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 380 }}>
             <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, color: '#111827' }}>
-              {modal.action === 'grant_points' ? '포인트 지급' : modal.action === 'deduct_points' ? '포인트 회수' : '역할 변경'}
+              {modal.action === 'grant_points' ? '포인트 지급' : modal.action === 'deduct_points' ? '포인트 회수' : modal.action === 'change_role' ? '역할 변경' : '프로필 편집'}
               <span style={{ color: '#6B7280', fontWeight: 600 }}> — {modal.nickname}</span>
             </div>
             {isPointsAction && modal.currentPoints != null && (
@@ -309,6 +315,35 @@ function UsersTab({ token }: { token: string | null }) {
                 <button onClick={() => callAction(modal.userId, { action: 'change_role', role: modalVal })} disabled={modalLoading}
                   style={{ width: '100%', padding: '13px', background: '#111827', color: '#fff', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                   {modalLoading ? '처리 중...' : '역할 변경'}
+                </button>
+              </>
+            )}
+            {isProfileAction && (
+              <>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', marginBottom: 5 }}>닉네임</div>
+                  <input value={profileNickname} onChange={e => setProfileNickname(e.target.value)}
+                    placeholder="닉네임 (2자 이상)"
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }} />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', marginBottom: 5 }}>이메일 (관리자만 변경 가능)</div>
+                  <input value={profileEmail} onChange={e => setProfileEmail(e.target.value)}
+                    placeholder="이메일"
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }} />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', marginBottom: 5 }}>전화번호</div>
+                  <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
+                    placeholder="010-0000-0000"
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #E5E7EB', fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }} />
+                </div>
+                {modalError && <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>✕ {modalError}</div>}
+                <button
+                  onClick={() => callAction(modal.userId, { action: 'update_profile', nickname: profileNickname, email: profileEmail, phone: profilePhone })}
+                  disabled={modalLoading}
+                  style={{ width: '100%', padding: '13px', background: '#15803D', color: '#fff', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {modalLoading ? '저장 중...' : '프로필 저장'}
                 </button>
               </>
             )}
