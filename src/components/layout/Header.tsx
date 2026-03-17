@@ -107,16 +107,12 @@ export default function Header() {
                   {user.role === 'admin' ? '관리자' : '매니저'}
                 </Link>
               )}
-              {(user.role === 'buyer' || user.role === 'seller') && (
-                <Link href="/seller/dashboard" className="hdr-sell-btn desktop-only" style={{ background: '#0369A1' }}>
-                  판매자 콘솔
-                </Link>
-              )}
-              {(user.role === 'buyer' || user.role === 'seller') && (
-                <Link href="/seller/programs/new" className="hdr-sell-btn desktop-only">
-                  프로그램 등록 →
-                </Link>
-              )}
+              <Link href="/seller/dashboard" className="hdr-sell-btn desktop-only" style={{ background: '#0369A1' }}>
+                판매자 콘솔
+              </Link>
+              <Link href="/seller/programs/new" className="hdr-sell-btn desktop-only">
+                프로그램 등록 →
+              </Link>
 
               {/* 장바구니 */}
               <Link href="/my/cart" className="hdr-icon-btn" title="장바구니">
@@ -174,9 +170,7 @@ export default function Header() {
                         {unreadCount > 0 && <Dot />}
                       </Link>
 
-                      {(user.role === 'buyer' || user.role === 'seller') && (
-                        <Link href="/seller/dashboard" onClick={() => setUserMenuOpen(false)}>🏪 판매자 콘솔</Link>
-                      )}
+                      <Link href="/seller/dashboard" onClick={() => setUserMenuOpen(false)}>🏪 판매자 콘솔</Link>
 
                       {(user.role === 'admin' || user.role === 'manager') && (
                         <Link href="/admin" onClick={() => setUserMenuOpen(false)}>
@@ -236,12 +230,10 @@ export default function Header() {
                   💬 1:1 문의
                   {inquiryDot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444' }} />}
                 </Link>
-                {(user.role === 'buyer' || user.role === 'seller') && (
-                  <Link href="/seller/dashboard" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
-                    style={{ color: '#0369A1', fontWeight: 800 }}>
-                    🏪 판매자 콘솔
-                  </Link>
-                )}
+                <Link href="/seller/dashboard" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
+                  style={{ color: '#0369A1', fontWeight: 800 }}>
+                  🏪 판매자 콘솔
+                </Link>
                 {(user.role === 'admin' || user.role === 'manager') && (
                   <Link href="/admin" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
                     style={{ color: user.role === 'admin' ? '#7C3AED' : '#1D4ED8', fontWeight: 800 }}>
