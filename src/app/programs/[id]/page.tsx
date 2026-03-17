@@ -278,8 +278,10 @@ export default function ProgramDetailPage() {
               {p.subtitle && <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>{p.subtitle}</p>}
 
               <Link href={`/sellers/${p.seller.id}`} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 16, background: '#F9FAFB', borderRadius: 12, marginBottom: 20, textDecoration: 'none' }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#667EEA,#764BA2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff', fontWeight: 900 }}>
-                  {p.seller.nickname[0]}
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#667EEA,#764BA2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff', fontWeight: 900, overflow: 'hidden', flexShrink: 0 }}>
+                  {p.seller.profile_image
+                    ? <img src={p.seller.profile_image} alt={p.seller.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+                    : p.seller.nickname[0]}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>{p.seller.nickname}</div>
