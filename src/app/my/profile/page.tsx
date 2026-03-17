@@ -17,7 +17,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { user, accessToken, updateUser } = useAuth()
+  const { user, accessToken, updateUser, logout } = useAuth()
   const router = useRouter()
 
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -31,6 +31,12 @@ export default function ProfilePage() {
   const [newPw2, setNewPw2] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  const [showWithdraw, setShowWithdraw] = useState(false)
+  const [withdrawPw, setWithdrawPw] = useState('')
+  const [withdrawConfirm, setWithdrawConfirm] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [withdrawErr, setWithdrawErr] = useState('')
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return }
@@ -76,6 +82,27 @@ export default function ProfilePage() {
       setPwMsg({ type: 'ok', text: '비밀번호가 변경되었습니다' })
     } else {
       setPwMsg({ type: 'err', text: d.error ?? '변경 실패' })
+    }
+  }
+
+  const handleWithdraw = async () => {
+    setWithdrawing(true); setWithdrawErr('')
+    const isEmail = profile?.oauth_provider === 'email' || profile?.oauth_provider === 'internal'
+    const body = isEmail ? { password: withdrawPw } : { confirm: withdrawConfirm }
+    try {
+      const res = await fetch('/api/my/account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(body),
+      })
+      const d = await res.json()
+      if (!res.ok) { setWithdrawErr(d.error ?? '탈퇴 처리 중 오류가 발생했습니다'); return }
+      logout()
+      router.replace('/')
+    } catch {
+      setWithdrawErr('네트워크 오류가 발생했습니다')
+    } finally {
+      setWithdrawing(false)
     }
   }
 
@@ -220,6 +247,81 @@ export default function ProfilePage() {
             </button>
           </div>
         )}
+
+        {/* 회원 탈퇴 */}
+        <div style={{ ...SECTION, border: '1px solid #FEE2E2' }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#991B1B', marginBottom: 6 }}>회원 탈퇴</div>
+          <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 16, lineHeight: 1.6 }}>
+            탈퇴 시 보유 포인트는 소멸되며, 개인정보는 즉시 삭제됩니다.<br />
+            구매 내역 등 거래 기록은 관계 법령에 따라 보관됩니다.
+          </div>
+
+          {!showWithdraw ? (
+            <button
+              onClick={() => setShowWithdraw(true)}
+              style={{ padding: '10px 20px', background: 'none', border: '1.5px solid #FCA5A5', borderRadius: 10, color: '#DC2626', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              회원 탈퇴 신청
+            </button>
+          ) : (
+            <div style={{ background: '#FEF2F2', borderRadius: 12, padding: 18 }}>
+              {profile.oauth_provider === 'email' || profile.oauth_provider === 'internal' ? (
+                <>
+                  <label style={{ ...LABEL, color: '#991B1B' }}>비밀번호 확인</label>
+                  <input
+                    type="password"
+                    value={withdrawPw}
+                    onChange={e => setWithdrawPw(e.target.value)}
+                    placeholder="현재 비밀번호 입력"
+                    style={{ ...INPUT, marginBottom: 12, borderColor: '#FCA5A5' }}
+                  />
+                </>
+              ) : (
+                <>
+                  <label style={{ ...LABEL, color: '#991B1B' }}>
+                    아래에 <strong>탈퇴합니다</strong>를 입력하세요
+                  </label>
+                  <input
+                    value={withdrawConfirm}
+                    onChange={e => setWithdrawConfirm(e.target.value)}
+                    placeholder="탈퇴합니다"
+                    style={{ ...INPUT, marginBottom: 12, borderColor: '#FCA5A5' }}
+                  />
+                </>
+              )}
+
+              {withdrawErr && (
+                <div style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  {withdrawErr}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => { setShowWithdraw(false); setWithdrawPw(''); setWithdrawConfirm(''); setWithdrawErr('') }}
+                  style={{ flex: 1, padding: '11px', background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleWithdraw}
+                  disabled={withdrawing || (
+                    (profile.oauth_provider === 'email' || profile.oauth_provider === 'internal')
+                      ? !withdrawPw
+                      : withdrawConfirm !== '탈퇴합니다'
+                  )}
+                  style={{
+                    flex: 1, padding: '11px', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 800,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    background: '#DC2626', color: '#fff', opacity: withdrawing ? 0.7 : 1,
+                  }}
+                >
+                  {withdrawing ? '처리 중...' : '탈퇴 확인'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
       </main>
     </div>

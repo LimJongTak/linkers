@@ -190,6 +190,11 @@ function UsersTab({ token }: { token: string | null }) {
   const [modalLoading, setModalLoading] = useState(false)
   const [modalError, setModalError] = useState('')
 
+  const [withdrawModal, setWithdrawModal] = useState<{ userId: string; nickname: string } | null>(null)
+  const [withdrawSecret, setWithdrawSecret] = useState('')
+  const [withdrawLoading, setWithdrawLoading] = useState(false)
+  const [withdrawError, setWithdrawError] = useState('')
+
   const callAction = async (userId: string, body: object) => {
     setModalLoading(true); setModalError('')
     try {
@@ -204,6 +209,23 @@ function UsersTab({ token }: { token: string | null }) {
       show('처리 완료!')
       reload()
     } finally { setModalLoading(false) }
+  }
+
+  const handleAdminWithdraw = async () => {
+    if (!withdrawModal) return
+    setWithdrawLoading(true); setWithdrawError('')
+    try {
+      const res = await fetch(`/api/admin/users/${withdrawModal.userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ secret: withdrawSecret }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setWithdrawError(d.error ?? '오류 발생'); return }
+      setWithdrawModal(null); setWithdrawSecret('')
+      show(`${withdrawModal.nickname} 회원 탈퇴 처리 완료`)
+      reload()
+    } finally { setWithdrawLoading(false) }
   }
 
   const isPointsAction = modal?.action === 'grant_points' || modal?.action === 'deduct_points'
@@ -264,6 +286,8 @@ function UsersTab({ token }: { token: string | null }) {
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#DBEAFE', color: '#1D4ED8', cursor: 'pointer', fontFamily: 'inherit' }}>역할</button>
                         <button onClick={() => { setModal({ userId: u.id, nickname: u.nickname, action: 'update_profile', email: u.email, phone: u.phone }); setProfileNickname(u.nickname); setProfilePhone(u.phone ?? ''); setProfileEmail(u.email ?? '') }}
                           style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#F0FDF4', color: '#15803D', cursor: 'pointer', fontFamily: 'inherit' }}>프로필</button>
+                        <button onClick={() => { setWithdrawModal({ userId: u.id, nickname: u.nickname }); setWithdrawSecret(''); setWithdrawError('') }}
+                          style={{ fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer', fontFamily: 'inherit' }}>탈퇴</button>
                       </div>
                     </td>
                   </tr>
@@ -347,6 +371,43 @@ function UsersTab({ token }: { token: string | null }) {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 회원 탈퇴 모달 */}
+      {withdrawModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => e.target === e.currentTarget && setWithdrawModal(null)}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 400 }}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: '#991B1B', marginBottom: 6 }}>🚨 회원 강제 탈퇴</div>
+            <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20, lineHeight: 1.6 }}>
+              <strong style={{ color: '#111827' }}>{withdrawModal.nickname}</strong> 회원을 탈퇴 처리합니다.<br />
+              개인정보가 즉시 익명화되며 이 작업은 되돌릴 수 없습니다.
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>ADMIN_INIT_SECRET 키 입력</label>
+              <input
+                type="password"
+                value={withdrawSecret}
+                onChange={e => setWithdrawSecret(e.target.value)}
+                placeholder="관리자 시크릿 키"
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #FCA5A5', fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
+            {withdrawError && (
+              <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>✕ {withdrawError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setWithdrawModal(null)}
+                style={{ flex: 1, padding: '12px', background: '#F9FAFB', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', color: '#374151' }}>
+                취소
+              </button>
+              <button onClick={handleAdminWithdraw} disabled={withdrawLoading || !withdrawSecret}
+                style={{ flex: 1, padding: '12px', background: withdrawSecret ? '#DC2626' : '#E5E7EB', color: withdrawSecret ? '#fff' : '#9CA3AF', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: withdrawSecret ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: withdrawLoading ? 0.7 : 1 }}>
+                {withdrawLoading ? '처리 중...' : '탈퇴 처리'}
+              </button>
+            </div>
           </div>
         </div>
       )}

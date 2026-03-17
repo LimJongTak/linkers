@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyAccessToken, requireRole, handleError, ApiError } from '@/lib/auth'
+import { randomUUID } from 'crypto'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -110,9 +111,31 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const admin = verifyAccessToken(req)
     requireRole(admin, 'admin')
     const { id } = await params
-    if (admin.userId === id) throw new ApiError(400, 'CANNOT_DELETE_SELF')
+    const { secret } = await req.json()
 
-    await db.user.delete({ where: { id } })
+    if (!secret || secret !== process.env.ADMIN_INIT_SECRET) {
+      throw new ApiError(403, '관리자 시크릿 키가 올바르지 않습니다')
+    }
+    if (admin.userId === id) throw new ApiError(400, '자기 자신은 탈퇴시킬 수 없습니다')
+
+    const target = await db.user.findUnique({ where: { id } })
+    if (!target) throw new ApiError(404, '사용자를 찾을 수 없습니다')
+
+    // 개인정보 익명화 (기록 보존, PII 삭제)
+    await db.user.update({
+      where: { id },
+      data: {
+        email: null,
+        nickname: '탈퇴한 사용자',
+        phone: null,
+        profile_image: null,
+        password_hash: null,
+        oauth_provider: 'deleted',
+        oauth_id: randomUUID(),
+        points: 0,
+      },
+    })
+
     return Response.json({ success: true })
   } catch (err) {
     return handleError(err)
