@@ -128,9 +128,11 @@ export default function Header() {
 
               {/* 유저 아바타 + 드롭다운 */}
               <div style={{ position: 'relative' }}>
-                <button className="hdr-avatar" onClick={() => setUserMenuOpen(v => !v)}>
-                  {user.nickname[0]}
-                  {/* 아바타에도 빨간 점 (알림 or 문의) */}
+                <button className="hdr-avatar" onClick={() => setUserMenuOpen(v => !v)}
+                  style={{ padding: 0, overflow: 'hidden' }}>
+                  {user.profileImage
+                    ? <img src={user.profileImage} alt={user.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} referrerPolicy="no-referrer" />
+                    : user.nickname[0]}
                   {(unreadCount > 0 || inquiryDot) && (
                     <span style={{ position: 'absolute', top: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#EF4444', border: '2px solid #fff' }} />
                   )}

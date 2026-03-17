@@ -51,7 +51,11 @@ export default function MyPage() {
       <main className="my-main" style={{ maxWidth: 680, margin: '0 auto', padding: '32px 24px 60px' }}>
         {/* 프로필 카드 */}
         <div className="my-profile" style={{ background: 'linear-gradient(135deg, #111827, #1F2D45)', borderRadius: 24, padding: 28, marginBottom: 16, display: 'flex', gap: 20, alignItems: 'center' }}>
-          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #4FC3F7, #667EEA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{user.nickname[0]}</div>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #4FC3F7, #667EEA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+            {user.profileImage
+              ? <img src={user.profileImage} alt={user.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+              : user.nickname[0]}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nickname}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>

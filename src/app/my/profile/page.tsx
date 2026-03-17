@@ -32,6 +32,9 @@ export default function ProfilePage() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
+  const [imgUploading, setImgUploading] = useState(false)
+  const [imgErr, setImgErr] = useState('')
+
   const [showWithdraw, setShowWithdraw] = useState(false)
   const [withdrawPw, setWithdrawPw] = useState('')
   const [withdrawConfirm, setWithdrawConfirm] = useState('')
@@ -85,6 +88,30 @@ export default function ProfilePage() {
     }
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImgUploading(true); setImgErr('')
+    try {
+      const form = new FormData()
+      form.append('image', file)
+      const res = await fetch('/api/my/profile/image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: form,
+      })
+      const d = await res.json()
+      if (!res.ok) { setImgErr(d.error ?? '업로드 실패'); return }
+      setProfile(prev => prev ? { ...prev, profile_image: d.profileImageUrl } : prev)
+      updateUser({ profileImage: d.profileImageUrl })
+    } catch {
+      setImgErr('네트워크 오류가 발생했습니다')
+    } finally {
+      setImgUploading(false)
+      e.target.value = ''
+    }
+  }
+
   const handleWithdraw = async () => {
     setWithdrawing(true); setWithdrawErr('')
     const isEmail = profile?.oauth_provider === 'email' || profile?.oauth_provider === 'internal'
@@ -132,22 +159,39 @@ export default function ProfilePage() {
 
         {/* 프로필 아바타 */}
         <div style={{ ...SECTION, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: '50%', flexShrink: 0,
-            background: profile.profile_image ? 'transparent' : 'linear-gradient(135deg,#4FC3F7,#667EEA)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 26, fontWeight: 900, color: '#fff', overflow: 'hidden',
-          }}>
-            {profile.profile_image
-              ? <img src={profile.profile_image} alt="프로필" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : profile.nickname[0]}
-          </div>
+          <label style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: profile.profile_image ? 'transparent' : 'linear-gradient(135deg,#4FC3F7,#667EEA)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28, fontWeight: 900, color: '#fff', overflow: 'hidden',
+              border: '3px solid #E5E7EB',
+            }}>
+              {profile.profile_image
+                ? <img src={profile.profile_image} alt="프로필" style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+                : profile.nickname[0]}
+            </div>
+            {/* 카메라 오버레이 */}
+            <div style={{
+              position: 'absolute', bottom: 0, right: 0,
+              width: 24, height: 24, borderRadius: '50%',
+              background: '#111827', border: '2px solid #fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12,
+            }}>📷</div>
+            <input type="file" accept="image/*" onChange={handleImageUpload}
+              style={{ display: 'none' }} disabled={imgUploading} />
+          </label>
           <div>
             <div style={{ fontSize: 17, fontWeight: 900, color: '#111827' }}>{profile.nickname}</div>
             <div style={{ fontSize: 13, color: '#9CA3AF', marginTop: 2 }}>
               {providerLabel[profile.oauth_provider] ?? profile.oauth_provider} 로그인
               {profile.email && ` · ${profile.email}`}
             </div>
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+              {imgUploading ? '업로드 중...' : '사진을 클릭해 변경'}
+            </div>
+            {imgErr && <div style={{ fontSize: 11, color: '#EF4444', marginTop: 2 }}>{imgErr}</div>}
           </div>
         </div>
 

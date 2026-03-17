@@ -123,9 +123,10 @@ function LoginContent() {
     const uid  = searchParams.get('uid')
     const nick = searchParams.get('nick')
     const role = searchParams.get('role') as 'buyer' | 'seller' | 'admin' | null
+    const img  = searchParams.get('img')
     const isNew = searchParams.get('new') === '1'
     if (at && uid && nick && role) {
-      login(at, { id: uid, nickname: nick, role })
+      login(at, { id: uid, nickname: nick, role, profileImage: img ?? undefined })
       router.replace(isNew ? '/onboarding' : '/')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

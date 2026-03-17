@@ -43,7 +43,7 @@ export default function OnboardingPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? '저장 실패'); return }
-      updateUser({ nickname: nickname.trim(), role })
+      updateUser({ nickname: nickname.trim(), role: role as any })
       router.replace('/')
     } catch {
       setError('네트워크 오류가 발생했습니다')

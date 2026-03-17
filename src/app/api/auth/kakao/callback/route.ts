@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
     redirectUrl.searchParams.set('uid', user.id)
     redirectUrl.searchParams.set('nick', user.nickname)
     redirectUrl.searchParams.set('role', user.role)
+    if (user.profile_image) redirectUrl.searchParams.set('img', user.profile_image)
     if (isNew) redirectUrl.searchParams.set('new', '1')
 
     const response = NextResponse.redirect(redirectUrl)
