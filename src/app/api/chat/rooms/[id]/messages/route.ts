@@ -47,9 +47,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const user = verifyAccessToken(req)
     const { id } = await params
-    const { content } = await req.json()
+    const { content, imageUrl } = await req.json()
 
-    if (!content?.trim()) throw new ApiError(400, '메시지 내용을 입력해주세요')
+    if (!content?.trim() && !imageUrl) throw new ApiError(400, '메시지 내용 또는 이미지를 첨부해주세요')
 
     const room = await db.chatRoom.findUnique({
       where: { id },
@@ -65,7 +65,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       data: {
         room_id: id,
         sender_id: user.userId,
-        content: content.trim(),
+        content: content?.trim() ?? '',
+        image_url: imageUrl ?? null,
       },
       include: {
         sender: { select: { id: true, nickname: true, profile_image: true, role: true } },
@@ -80,6 +81,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 상대방에게 알림 전송
     const senderNickname = message.sender.nickname
+    const notifBody = content?.trim()
+      ? content.trim().slice(0, 50)
+      : imageUrl
+        ? '[이미지]'
+        : ''
     if (room.type === 'admin') {
       // admin 채팅: 관리자가 보냈으면 → user에게, user가 보냈으면 → 관리자들에게는 알림 없음(관리자는 목록에서 확인)
       if (user.userId !== room.user_id) {
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           room.user_id,
           'chat_message',
           '새 채팅 메시지',
-          `관리자: ${content.trim().slice(0, 50)}`,
+          `관리자: ${notifBody}`,
           `/my/chat/${id}`
         )
       }
@@ -98,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         recipientId,
         'chat_message',
         `${senderNickname}님의 새 메시지`,
-        content.trim().slice(0, 50),
+        notifBody,
         user.userId === room.user_id ? `/seller/chat/${id}` : `/my/chat/${id}`
       )
     }

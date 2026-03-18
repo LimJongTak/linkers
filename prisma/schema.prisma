@@ -463,6 +463,7 @@ model ChatMessage {
   room_id    String
   sender_id  String
   content    String   @db.Text
+  image_url  String?
   is_read    Boolean  @default(false)
   created_at DateTime @default(now())
 
