@@ -288,9 +288,11 @@ export default function AdminChatWidget() {
           }}>
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-            }}>🛡️</div>
+              background: '#111827', overflow: 'hidden',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <img src="/icon.svg" alt="링커스" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>링커스 고객지원</div>
               <div style={{ fontSize: 11, opacity: 0.8 }}>관리자가 곧 답변드립니다</div>
@@ -332,8 +334,10 @@ export default function AdminChatWidget() {
                         width: 28, height: 28, borderRadius: '50%',
                         background: BUBBLE,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 14, flexShrink: 0,
-                      }}>🛡️</div>
+                        overflow: 'hidden', flexShrink: 0,
+                      }}>
+                        <img src="/icon.svg" alt="링커스" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      </div>
                     )}
                     <div style={{ maxWidth: '78%' }}>
                       {!isMine && (
