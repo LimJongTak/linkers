@@ -379,9 +379,14 @@ export default function SellerDashboardPage() {
       <main className="dash-main" style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px' }}>
         <div className="dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, fontWeight: 900, color: '#111827' }}>판매자 대시보드</h1>
-          <Link href="/seller/programs/new" style={{ background: '#111827', color: '#fff', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            + 프로그램 등록
-          </Link>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/seller/chat" style={{ background: '#0369A1', color: '#fff', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              💬 채팅
+            </Link>
+            <Link href="/seller/programs/new" style={{ background: '#111827', color: '#fff', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              + 프로그램 등록
+            </Link>
+          </div>
         </div>
 
         <div className="dash-tab-bar" style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #F0EDE8' }}>

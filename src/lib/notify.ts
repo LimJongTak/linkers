@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 
-type NotificationType = 'order_paid' | 'order_confirmed' | 'order_refunded' | 'withdrawal_processed' | 'inquiry_answered'
+type NotificationType = 'order_paid' | 'order_confirmed' | 'order_refunded' | 'withdrawal_processed' | 'inquiry_answered' | 'chat_message'
 
 export async function createNotification(
   userId: string,

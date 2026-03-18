@@ -14,6 +14,7 @@ export default function Header() {
   const [cartCount, setCartCount] = useState(0)
   const [unreadCount, setUnreadCount] = useState(0)      // 알림 미읽음 총계
   const [inquiryDot, setInquiryDot] = useState(false)   // 문의 빨간 점
+  const [chatUnread, setChatUnread] = useState(0)        // 채팅 미읽음 수
 
   const nav = [
     { href: '/', label: '프로그램 찾기' },
@@ -40,12 +41,17 @@ export default function Header() {
       .then(r => r.ok ? r.json() : { total: 0 })
       .then(d => setInquiryDot((d.total ?? 0) > 0))
       .catch(() => {})
+    fetch('/api/chat/unread', { headers: h })
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then(d => setChatUnread(d.count ?? 0))
+      .catch(() => {})
   }, [user, accessToken])
 
   // 해당 페이지 방문 시 해당 빨간 점 제거
   useEffect(() => {
     if (pathname === '/my/notifications') setUnreadCount(0)
     if (pathname?.startsWith('/my/inquiries')) setInquiryDot(false)
+    if (pathname?.startsWith('/my/chat') || pathname?.startsWith('/seller/chat') || pathname?.startsWith('/admin/chat')) setChatUnread(0)
   }, [pathname])
 
   const handleLogout = () => {
@@ -158,9 +164,15 @@ export default function Header() {
                       <Link href="/my/orders" onClick={() => setUserMenuOpen(false)}>📋 구매 내역</Link>
                       <Link href="/my/downloads" onClick={() => setUserMenuOpen(false)}>⬇️ 다운로드</Link>
 
+                      {/* 채팅 */}
+                      <Link href="/my/chat" onClick={() => { setUserMenuOpen(false); setChatUnread(0) }}>
+                        💬 채팅
+                        {chatUnread > 0 && <Dot />}
+                      </Link>
+
                       {/* 1:1 문의 — 빨간 점 */}
                       <Link href="/my/inquiries" onClick={() => { setUserMenuOpen(false); setInquiryDot(false) }}>
-                        💬 1:1 문의
+                        📋 1:1 문의
                         {inquiryDot && <Dot />}
                       </Link>
 
@@ -173,10 +185,16 @@ export default function Header() {
                       <Link href="/seller/dashboard" onClick={() => setUserMenuOpen(false)}>🏪 판매자 콘솔</Link>
 
                       {(user.role === 'admin' || user.role === 'manager') && (
-                        <Link href="/admin" onClick={() => setUserMenuOpen(false)}>
-                          ⚙️ {user.role === 'admin' ? '관리자 콘솔' : '매니저 콘솔'}
-                          {inquiryDot && <Dot />}
-                        </Link>
+                        <>
+                          <Link href="/admin/chat" onClick={() => { setUserMenuOpen(false); setChatUnread(0) }}>
+                            💬 고객 채팅
+                            {chatUnread > 0 && <Dot />}
+                          </Link>
+                          <Link href="/admin" onClick={() => setUserMenuOpen(false)}>
+                            ⚙️ {user.role === 'admin' ? '관리자 콘솔' : '매니저 콘솔'}
+                            {inquiryDot && <Dot />}
+                          </Link>
+                        </>
                       )}
 
                       <div style={{ borderTop: '1px solid #F3F4F6', marginTop: 4, paddingTop: 4 }}>
@@ -226,19 +244,33 @@ export default function Header() {
                   🔔 알림{unreadCount > 0 ? ` (${unreadCount})` : ''}
                   {unreadCount > 0 && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444' }} />}
                 </Link>
+                <Link href="/my/chat" className="mobile-nav-link" onClick={() => { setMobileOpen(false); setChatUnread(0) }}>
+                  💬 채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
+                  {chatUnread > 0 && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444' }} />}
+                </Link>
                 <Link href="/my/inquiries" className="mobile-nav-link" onClick={() => { setMobileOpen(false); setInquiryDot(false) }}>
-                  💬 1:1 문의
+                  📋 1:1 문의
                   {inquiryDot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444' }} />}
                 </Link>
                 <Link href="/seller/dashboard" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
                   style={{ color: '#0369A1', fontWeight: 800 }}>
                   🏪 판매자 콘솔
                 </Link>
+                <Link href="/seller/chat" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
+                  style={{ color: '#0369A1' }}>
+                  💬 구매자 채팅
+                </Link>
                 {(user.role === 'admin' || user.role === 'manager') && (
-                  <Link href="/admin" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
-                    style={{ color: user.role === 'admin' ? '#7C3AED' : '#1D4ED8', fontWeight: 800 }}>
-                    ⚙️ {user.role === 'admin' ? '관리자 콘솔' : '매니저 콘솔'}
-                  </Link>
+                  <>
+                    <Link href="/admin/chat" className="mobile-nav-link" onClick={() => { setMobileOpen(false); setChatUnread(0) }}
+                      style={{ color: user.role === 'admin' ? '#7C3AED' : '#1D4ED8' }}>
+                      💬 고객 채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
+                    </Link>
+                    <Link href="/admin" className="mobile-nav-link" onClick={() => setMobileOpen(false)}
+                      style={{ color: user.role === 'admin' ? '#7C3AED' : '#1D4ED8', fontWeight: 800 }}>
+                      ⚙️ {user.role === 'admin' ? '관리자 콘솔' : '매니저 콘솔'}
+                    </Link>
+                  </>
                 )}
                 <Link href="/seller/programs/new" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>➕ 프로그램 등록</Link>
                 <button onClick={() => { handleLogout(); setMobileOpen(false) }}

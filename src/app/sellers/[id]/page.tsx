@@ -1,9 +1,10 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import Header from '@/components/layout/Header'
+import { useAuth } from '@/store/auth'
 
 const fmt = (n: number) => n === 0 ? '무료' : `${n.toLocaleString()}원`
 const catGrad = (c: string) => ({ '레크리에이션': '#E0F2FE,#BAE6FD', '교육': '#EDE9FE,#DDD6FE', '진로': '#FEF3C7,#FDE68A', '예체능': '#FCE7F3,#FBCFE8', '재능봉사': '#D1FAE5,#A7F3D0' }[c] ?? '#F3F4F6,#E5E7EB')
@@ -34,8 +35,11 @@ interface SellerProfile {
 
 export default function SellerProfilePage() {
   const { id } = useParams<{ id: string }>()
+  const { user, accessToken } = useAuth()
+  const router = useRouter()
   const [seller, setSeller] = useState<SellerProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [chatLoading, setChatLoading] = useState(false)
 
   useEffect(() => {
     fetch(`/api/sellers/${id}`)
@@ -68,6 +72,24 @@ export default function SellerProfilePage() {
 
   const joinYear = new Date(seller.joinedAt).getFullYear()
 
+  const handleChat = async () => {
+    if (!user) { router.push('/login'); return }
+    setChatLoading(true)
+    try {
+      const res = await fetch('/api/chat/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ type: 'seller', sellerId: id }),
+      })
+      if (res.ok) {
+        const { room } = await res.json()
+        router.push(`/my/chat/${room.id}`)
+      }
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
   return (
     <div style={{ fontFamily: "'Pretendard Variable',Pretendard,-apple-system,sans-serif", minHeight: '100vh', background: '#F7F6F3' }}>
       <style>{`
@@ -95,7 +117,13 @@ export default function SellerProfilePage() {
             }
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', marginBottom: 6 }}>{seller.nickname}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>{joinYear}년부터 활동 중</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>{joinYear}년부터 활동 중</div>
+          {user?.id !== id && (
+            <button onClick={handleChat} disabled={chatLoading}
+              style={{ background: chatLoading ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 10, padding: '10px 22px', fontSize: 13, fontWeight: 800, cursor: chatLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginBottom: 20, backdropFilter: 'blur(4px)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              💬 {chatLoading ? '연결 중...' : '채팅하기'}
+            </button>
+          )}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 32 }}>
             {[
               { v: seller.programCount, l: '등록 자료' },
