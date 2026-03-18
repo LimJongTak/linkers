@@ -464,6 +464,8 @@ model ChatMessage {
   sender_id  String
   content    String   @db.Text
   image_url  String?
+  file_url   String?
+  file_name  String?
   is_read    Boolean  @default(false)
   created_at DateTime @default(now())
 

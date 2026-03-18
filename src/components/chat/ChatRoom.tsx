@@ -8,6 +8,8 @@ interface Message {
   id: string
   content: string
   image_url: string | null
+  file_url: string | null
+  file_name: string | null
   sender_id: string
   is_read: boolean
   created_at: string
@@ -29,18 +31,34 @@ interface ChatRoomProps {
   otherParty: OtherParty
 }
 
+function FileIcon({ name }: { name: string }) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  const map: Record<string, string> = {
+    pdf: '📄', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊',
+    ppt: '📊', pptx: '📊', zip: '🗜️', rar: '🗜️', txt: '📃',
+    hwp: '📝', csv: '📊',
+  }
+  return <>{map[ext] ?? '📎'}</>
+}
+
 export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }: ChatRoomProps) {
   const { user, accessToken } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Image attachment
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [previewSrc, setPreviewSrc] = useState<string | null>(null)
+  // File attachment
+  const [pendingFileUrl, setPendingFileUrl] = useState<string | null>(null)
+  const [pendingFileName, setPendingFileName] = useState<string | null>(null)
+  const [fileUploading, setFileUploading] = useState(false)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastMsgTimeRef = useRef<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const attachInputRef = useRef<HTMLInputElement>(null)
 
   // Initial load
   useEffect(() => {
@@ -52,16 +70,14 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
       .then(d => {
         const msgs: Message[] = d.messages ?? []
         setMessages(msgs)
-        if (msgs.length > 0) {
-          lastMsgTimeRef.current = msgs[msgs.length - 1].created_at
-        }
+        if (msgs.length > 0) lastMsgTimeRef.current = msgs[msgs.length - 1].created_at
       })
       .finally(() => setLoading(false))
 
     fetch(`/api/chat/rooms/${roomId}/read`, { method: 'PATCH', headers: h })
   }, [roomId, user, accessToken])
 
-  // Polling — every 3 seconds
+  // Polling every 3 seconds
   useEffect(() => {
     if (!accessToken) return
     const poll = setInterval(() => {
@@ -90,61 +106,9 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
     return () => clearInterval(poll)
   }, [roomId, accessToken])
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다')
-      e.target.value = ''
-      return
-    }
-
-    const MAX_SIZE = 10 * 1024 * 1024
-    if (file.size > MAX_SIZE) {
-      alert('이미지 파일 크기는 10MB 이하여야 합니다')
-      e.target.value = ''
-      return
-    }
-
-    // Show local preview immediately
-    const localPreview = URL.createObjectURL(file)
-    setPreviewSrc(localPreview)
-    setImageUploading(true)
-    setPendingImageUrl(null)
-
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-
-      const res = await fetch(`/api/chat/rooms/${roomId}/image`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? '이미지 업로드에 실패했습니다')
-      }
-
-      const { imageUrl } = await res.json()
-      setPendingImageUrl(imageUrl)
-    } catch (err: any) {
-      alert(err.message ?? '이미지 업로드에 실패했습니다')
-      setPreviewSrc(null)
-      setPendingImageUrl(null)
-      URL.revokeObjectURL(localPreview)
-    } finally {
-      setImageUploading(false)
-      e.target.value = ''
-    }
-  }, [roomId, accessToken])
 
   const clearPendingImage = useCallback(() => {
     if (previewSrc) URL.revokeObjectURL(previewSrc)
@@ -153,17 +117,95 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
     setImageUploading(false)
   }, [previewSrc])
 
+  const clearPendingFile = useCallback(() => {
+    setPendingFileUrl(null)
+    setPendingFileName(null)
+    setFileUploading(false)
+  }, [])
+
+  const handleAttachSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    if (file.type.startsWith('image/')) {
+      // ─── Image ───
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 파일 크기는 10MB 이하여야 합니다')
+        return
+      }
+      const localPreview = URL.createObjectURL(file)
+      setPreviewSrc(localPreview)
+      setImageUploading(true)
+      setPendingImageUrl(null)
+      try {
+        const form = new FormData()
+        form.append('image', file)
+        const res = await fetch(`/api/chat/rooms/${roomId}/image`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form,
+        })
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          throw new Error(d.error ?? '이미지 업로드에 실패했습니다')
+        }
+        const { imageUrl } = await res.json()
+        setPendingImageUrl(imageUrl)
+      } catch (err: any) {
+        alert(err.message ?? '이미지 업로드에 실패했습니다')
+        setPreviewSrc(null)
+        URL.revokeObjectURL(localPreview)
+      } finally {
+        setImageUploading(false)
+      }
+    } else {
+      // ─── File ───
+      if (file.size > 20 * 1024 * 1024) {
+        alert('파일 크기는 20MB 이하여야 합니다')
+        return
+      }
+      setFileUploading(true)
+      setPendingFileUrl(null)
+      setPendingFileName(file.name)
+      try {
+        const form = new FormData()
+        form.append('file', file)
+        const res = await fetch(`/api/chat/rooms/${roomId}/file`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form,
+        })
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          throw new Error(d.error ?? '파일 업로드에 실패했습니다')
+        }
+        const { fileUrl, fileName } = await res.json()
+        setPendingFileUrl(fileUrl)
+        setPendingFileName(fileName)
+      } catch (err: any) {
+        alert(err.message ?? '파일 업로드에 실패했습니다')
+        setPendingFileName(null)
+      } finally {
+        setFileUploading(false)
+      }
+    }
+  }, [roomId, accessToken])
+
   const sendMessage = useCallback(async () => {
     const hasText = !!input.trim()
     const hasImage = !!pendingImageUrl
+    const hasFile = !!pendingFileUrl
+    const uploading = imageUploading || fileUploading
 
-    if ((!hasText && !hasImage) || sending || imageUploading) return
+    if ((!hasText && !hasImage && !hasFile) || sending || uploading) return
 
     setSending(true)
     try {
-      const body: { content?: string; imageUrl?: string } = {}
+      const body: Record<string, string> = {}
       if (hasText) body.content = input.trim()
       if (hasImage) body.imageUrl = pendingImageUrl!
+      if (hasFile) { body.fileUrl = pendingFileUrl!; body.fileName = pendingFileName! }
 
       const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
         method: 'POST',
@@ -177,64 +219,41 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
         lastMsgTimeRef.current = message.created_at
         setInput('')
         clearPendingImage()
+        clearPendingFile()
       }
     } finally {
       setSending(false)
     }
-  }, [roomId, input, sending, imageUploading, pendingImageUrl, accessToken, clearPendingImage])
+  }, [roomId, input, sending, imageUploading, fileUploading, pendingImageUrl, pendingFileUrl, pendingFileName, accessToken, clearPendingImage, clearPendingFile])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
-  const canSend = (!!input.trim() || !!pendingImageUrl) && !sending && !imageUploading
+  const uploading = imageUploading || fileUploading
+  const canSend = (!!input.trim() || !!pendingImageUrl || !!pendingFileUrl) && !sending && !uploading
 
   const renderAvatar = (size: number, fontSize: number) => (
     <div style={{
-      width: size,
-      height: size,
-      borderRadius: '50%',
-      background: otherParty.avatarBg,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize,
-      color: '#fff',
-      fontWeight: 900,
-      overflow: 'hidden',
-      flexShrink: 0,
+      width: size, height: size, borderRadius: '50%', background: otherParty.avatarBg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize, color: '#fff', fontWeight: 900, overflow: 'hidden', flexShrink: 0,
     }}>
-      {otherParty.avatarEmoji ? (
-        otherParty.avatarEmoji
-      ) : otherParty.image ? (
-        <img
-          src={otherParty.image}
-          alt={otherParty.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          referrerPolicy="no-referrer"
-        />
-      ) : (
-        otherParty.name[0]
-      )}
+      {otherParty.avatarEmoji ? otherParty.avatarEmoji
+        : otherParty.image ? (
+          <img src={otherParty.image} alt={otherParty.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+        ) : otherParty.name[0]}
     </div>
   )
 
   return (
     <>
-      {/* Chat header */}
+      {/* Header */}
       <div style={{
-        background: '#fff',
-        borderBottom: '1px solid #F0EDE8',
-        padding: '14px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        position: 'sticky',
-        top: 60,
-        zIndex: 50,
+        background: '#fff', borderBottom: '1px solid #F0EDE8', padding: '14px 20px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        position: 'sticky', top: 60, zIndex: 50,
       }}>
         <Link href={backHref} style={{ color: '#6B7280', textDecoration: 'none', fontSize: 20, lineHeight: 1 }}>←</Link>
         {renderAvatar(36, 16)}
@@ -244,18 +263,11 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
         </div>
       </div>
 
-      {/* Message area */}
+      {/* Messages */}
       <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '20px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        maxWidth: 720,
-        width: '100%',
-        margin: '0 auto',
-        boxSizing: 'border-box',
+        flex: 1, overflowY: 'auto', padding: '20px 16px',
+        display: 'flex', flexDirection: 'column', gap: 12,
+        maxWidth: 720, width: '100%', margin: '0 auto', boxSizing: 'border-box',
       }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#9CA3AF' }}>불러오는 중...</div>
@@ -267,7 +279,8 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
         ) : (
           messages.map((msg, i) => {
             const isMine = msg.sender_id === user?.id
-            const showDate = i === 0 || new Date(messages[i - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString()
+            const showDate = i === 0 ||
+              new Date(messages[i - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString()
 
             return (
               <div key={msg.id}>
@@ -290,26 +303,32 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
                       background: isMine ? myBubbleColor : '#fff',
                       color: isMine ? '#fff' : '#111827',
                       borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                      padding: msg.image_url && !msg.content ? '6px' : '10px 14px',
-                      fontSize: 14,
-                      lineHeight: 1.5,
+                      padding: (msg.image_url || msg.file_url) && !msg.content ? '6px' : '10px 14px',
+                      fontSize: 14, lineHeight: 1.5,
                       border: isMine ? 'none' : '1px solid #F0EDE8',
-                      wordBreak: 'break-word',
-                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word', whiteSpace: 'pre-wrap',
                     }}>
                       {msg.image_url && (
-                        <a href={msg.image_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: msg.content ? 8 : 0 }}>
-                          <img
-                            src={msg.image_url}
-                            alt="첨부 이미지"
-                            style={{
-                              maxWidth: 220,
-                              maxHeight: 220,
-                              borderRadius: 10,
-                              display: 'block',
-                              objectFit: 'cover',
-                            }}
-                          />
+                        <a href={msg.image_url} target="_blank" rel="noopener noreferrer"
+                          style={{ display: 'block', marginBottom: msg.content ? 8 : 0 }}>
+                          <img src={msg.image_url} alt="첨부 이미지"
+                            style={{ maxWidth: 220, maxHeight: 220, borderRadius: 10, display: 'block', objectFit: 'cover' }} />
+                        </a>
+                      )}
+                      {msg.file_url && (
+                        <a href={msg.file_url} target="_blank" rel="noopener noreferrer" download={msg.file_name ?? true}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            background: isMine ? 'rgba(255,255,255,0.15)' : '#F3F4F6',
+                            borderRadius: 10, padding: '8px 12px',
+                            color: isMine ? '#fff' : '#374151', textDecoration: 'none',
+                            fontSize: 13, marginBottom: msg.content ? 8 : 0,
+                            maxWidth: 220,
+                          }}>
+                          <span style={{ fontSize: 18, flexShrink: 0 }}><FileIcon name={msg.file_name ?? ''} /></span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {msg.file_name ?? '파일 다운로드'}
+                          </span>
                         </a>
                       )}
                       {msg.content && <span>{msg.content}</span>}
@@ -329,58 +348,26 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
       {/* Input area */}
       <div style={{ background: '#fff', borderTop: '1px solid #F0EDE8', padding: '12px 16px', position: 'sticky', bottom: 0 }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          {/* Image preview above input */}
+          {/* Image preview */}
           {(previewSrc || imageUploading) && (
             <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 {previewSrc && (
-                  <img
-                    src={previewSrc}
-                    alt="미리보기"
-                    style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #E5E7EB', display: 'block' }}
-                  />
+                  <img src={previewSrc} alt="미리보기"
+                    style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #E5E7EB', display: 'block' }} />
                 )}
                 {imageUploading && (
                   <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'rgba(0,0,0,0.45)',
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}>
-                    업로드 중
-                  </div>
+                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700,
+                  }}>업로드 중</div>
                 )}
                 {!imageUploading && (
-                  <button
-                    onClick={clearPendingImage}
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      width: 18,
-                      height: 18,
-                      borderRadius: '50%',
-                      background: '#374151',
-                      color: '#fff',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 11,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      lineHeight: 1,
-                      padding: 0,
-                    }}
-                    aria-label="이미지 제거"
-                  >
-                    ×
-                  </button>
+                  <button onClick={clearPendingImage} aria-label="이미지 제거" style={{
+                    position: 'absolute', top: -6, right: -6, width: 18, height: 18,
+                    borderRadius: '50%', background: '#374151', color: '#fff', border: 'none',
+                    cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                  }}>×</button>
                 )}
               </div>
               {pendingImageUrl && !imageUploading && (
@@ -389,38 +376,46 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
             </div>
           )}
 
+          {/* File preview */}
+          {(pendingFileName && !previewSrc) && (
+            <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: '#F3F4F6', borderRadius: 10, padding: '6px 10px',
+                fontSize: 13, color: '#374151', maxWidth: 260,
+              }}>
+                <span style={{ fontSize: 18 }}><FileIcon name={pendingFileName} /></span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{pendingFileName}</span>
+                {fileUploading && <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>업로드 중...</span>}
+                {!fileUploading && (
+                  <button onClick={clearPendingFile} aria-label="파일 제거" style={{
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: 16, padding: 0, lineHeight: 1,
+                  }}>×</button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleFileSelect}
-            />
+            {/* Hidden file input — accepts all files */}
+            <input ref={attachInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachSelect} />
 
             {/* Attach button */}
             <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={imageUploading}
+              onClick={() => attachInputRef.current?.click()}
+              disabled={uploading}
+              title="파일/이미지 첨부"
               style={{
-                background: imageUploading ? '#E5E7EB' : '#F3F4F6',
-                color: imageUploading ? '#9CA3AF' : '#374151',
-                border: '1px solid #E5E7EB',
-                borderRadius: 12,
-                width: 44,
-                height: 44,
-                fontSize: imageUploading ? 12 : 18,
-                cursor: imageUploading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background 0.15s',
+                background: uploading ? '#E5E7EB' : '#F3F4F6',
+                color: uploading ? '#9CA3AF' : '#374151',
+                border: '1px solid #E5E7EB', borderRadius: 12,
+                width: 44, height: 44, fontSize: uploading ? 12 : 18,
+                cursor: uploading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, transition: 'background 0.15s',
               }}
-              title="이미지 첨부"
             >
-              {imageUploading ? '...' : '📎'}
+              {uploading ? '...' : '📎'}
             </button>
 
             <textarea
@@ -430,17 +425,10 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
               placeholder="메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"
               rows={1}
               style={{
-                flex: 1,
-                padding: '10px 14px',
-                borderRadius: 12,
-                border: '2px solid #E5E7EB',
-                fontSize: 14,
-                fontFamily: 'inherit',
-                outline: 'none',
-                resize: 'none',
-                lineHeight: 1.5,
-                maxHeight: 120,
-                overflowY: 'auto',
+                flex: 1, padding: '10px 14px', borderRadius: 12,
+                border: '2px solid #E5E7EB', fontSize: 14, fontFamily: 'inherit',
+                outline: 'none', resize: 'none', lineHeight: 1.5,
+                maxHeight: 120, overflowY: 'auto',
               }}
               onInput={e => {
                 const t = e.target as HTMLTextAreaElement
@@ -455,17 +443,10 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
               style={{
                 background: canSend ? myBubbleColor : '#E5E7EB',
                 color: canSend ? '#fff' : '#9CA3AF',
-                border: 'none',
-                borderRadius: 12,
-                width: 44,
-                height: 44,
-                fontSize: 18,
+                border: 'none', borderRadius: 12, width: 44, height: 44, fontSize: 18,
                 cursor: canSend ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background 0.15s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, transition: 'background 0.15s',
               }}
             >
               {sending ? '...' : '↑'}
