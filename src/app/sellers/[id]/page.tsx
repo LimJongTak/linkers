@@ -81,10 +81,16 @@ export default function SellerProfilePage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ type: 'seller', sellerId: id }),
       })
-      if (res.ok) {
-        const { room } = await res.json()
-        router.push(`/my/chat/${room.id}`)
+      const data = await res.json()
+      if (res.ok && data.room?.id) {
+        router.push(`/my/chat/${data.room.id}`)
+      } else {
+        console.error('[채팅 시작 실패]', res.status, data)
+        alert(`채팅 시작에 실패했습니다. (${data?.error ?? res.status})\n개발자 콘솔을 확인해주세요.`)
       }
+    } catch (err) {
+      console.error('[채팅 연결 오류]', err)
+      alert('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setChatLoading(false)
     }

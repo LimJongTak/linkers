@@ -34,14 +34,22 @@ export default function MyChatPage() {
   }, [user, accessToken, router])
 
   const handleStartAdminChat = async () => {
-    const res = await fetch('/api/chat/rooms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ type: 'admin' }),
-    })
-    if (res.ok) {
-      const { room } = await res.json()
-      router.push(`/my/chat/${room.id}`)
+    try {
+      const res = await fetch('/api/chat/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ type: 'admin' }),
+      })
+      const data = await res.json()
+      if (res.ok && data.room?.id) {
+        router.push(`/my/chat/${data.room.id}`)
+      } else {
+        console.error('[관리자 채팅 시작 실패]', res.status, data)
+        alert(`채팅 시작 실패: ${data?.error ?? res.status}`)
+      }
+    } catch (err) {
+      console.error('[관리자 채팅 오류]', err)
+      alert('네트워크 오류가 발생했습니다.')
     }
   }
 
