@@ -72,8 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         sender_id: user.userId,
         content: content?.trim() ?? '',
         image_url: imageUrl ?? null,
-        file_url: fileUrl ?? null,
-        file_name: fileName ?? null,
+        ...(fileUrl ? { file_url: fileUrl, file_name: fileName ?? null } : {}),
       },
       include: {
         sender: { select: { id: true, nickname: true, profile_image: true, role: true } },
