@@ -30,7 +30,7 @@ export default function SellerChatPage() {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then(r => r.ok ? r.json() : { rooms: [] })
-      .then(d => setRooms((d.rooms ?? []).filter((r: ChatRoom) => r.type === 'seller' && r.seller_id === user.id)))
+      .then(d => setRooms((d.rooms ?? []).filter((r: ChatRoom) => r.type === 'seller' && r.seller_id === user?.id)))
       .finally(() => setLoading(false))
   }, [user, accessToken, router])
 

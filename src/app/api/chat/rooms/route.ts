@@ -14,42 +14,24 @@ export async function GET(req: NextRequest) {
         where: { type: 'admin' },
         include: {
           user: { select: { id: true, nickname: true, profile_image: true } },
-          messages: {
-            orderBy: { created_at: 'desc' },
-            take: 1,
-          },
+          messages: { orderBy: { created_at: 'desc' }, take: 1 },
         },
         orderBy: { updated_at: 'desc' },
       })
-    } else if (user.role === 'seller') {
-      // 판매자: 본인이 seller인 채팅방 + 본인이 user인 채팅방(관리자 채팅)
+    } else {
+      // 구매자/판매자 공통: 본인이 user이거나 seller인 채팅방 전체
+      // (role과 무관하게 — 구매자 계정으로도 판매자 역할 가능)
       rooms = await db.chatRoom.findMany({
         where: {
           OR: [
-            { seller_id: user.userId },
             { user_id: user.userId },
+            { seller_id: user.userId },
           ],
         },
         include: {
           user: { select: { id: true, nickname: true, profile_image: true } },
           seller: { select: { id: true, nickname: true, profile_image: true } },
-          messages: {
-            orderBy: { created_at: 'desc' },
-            take: 1,
-          },
-        },
-        orderBy: { updated_at: 'desc' },
-      })
-    } else {
-      // 구매자: 본인이 user인 채팅방 전체
-      rooms = await db.chatRoom.findMany({
-        where: { user_id: user.userId },
-        include: {
-          seller: { select: { id: true, nickname: true, profile_image: true } },
-          messages: {
-            orderBy: { created_at: 'desc' },
-            take: 1,
-          },
+          messages: { orderBy: { created_at: 'desc' }, take: 1 },
         },
         orderBy: { updated_at: 'desc' },
       })
@@ -88,11 +70,10 @@ export async function POST(req: NextRequest) {
       throw new ApiError(400, '판매자 채팅은 sellerId가 필요합니다')
     }
     if (type === 'seller' && sellerId === user.userId) {
-      throw new ApiError(400, '자기 자신에게 채팅을 보낼 수 없습니다')
+      throw new ApiError(400, '자기 자신과는 채팅할 수 없습니다')
     }
 
     if (type === 'seller') {
-      // 판매자 존재 확인
       const seller = await db.user.findUnique({ where: { id: sellerId } })
       if (!seller) throw new ApiError(404, '판매자를 찾을 수 없습니다')
     }
