@@ -2,14 +2,18 @@ import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyAccessToken, handleError, ApiError } from '@/lib/auth'
 
-// GET /api/chat/rooms — 내 채팅방 목록
+// GET /api/chat/rooms
+// ?context=admin  → 관리자 콘솔용: 모든 admin-type 방 반환
+// (기본)          → 내 방 전체: user_id OR seller_id = 나
 export async function GET(req: NextRequest) {
   try {
     const user = verifyAccessToken(req)
+    const { searchParams } = new URL(req.url)
+    const isAdminContext = searchParams.get('context') === 'admin'
 
     let rooms
-    if (user.role === 'admin' || user.role === 'manager') {
-      // 관리자: admin 타입 채팅방 전체 조회
+    if (isAdminContext && (user.role === 'admin' || user.role === 'manager')) {
+      // 관리자 콘솔 전용: 모든 고객 admin 채팅방
       rooms = await db.chatRoom.findMany({
         where: { type: 'admin' },
         include: {
@@ -19,8 +23,7 @@ export async function GET(req: NextRequest) {
         orderBy: { updated_at: 'desc' },
       })
     } else {
-      // 구매자/판매자 공통: 본인이 user이거나 seller인 채팅방 전체
-      // (role과 무관하게 — 구매자 계정으로도 판매자 역할 가능)
+      // 일반 조회: role 무관하게 내가 참여한 방 전체
       rooms = await db.chatRoom.findMany({
         where: {
           OR: [
@@ -37,7 +40,6 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 각 방의 안읽은 메시지 수 계산
     const roomsWithUnread = await Promise.all(
       rooms.map(async (room) => {
         const unreadCount = await db.chatMessage.count({
@@ -78,7 +80,6 @@ export async function POST(req: NextRequest) {
       if (!seller) throw new ApiError(404, '판매자를 찾을 수 없습니다')
     }
 
-    // 기존 채팅방 찾기
     const existing = await db.chatRoom.findFirst({
       where:
         type === 'admin'
@@ -90,7 +91,6 @@ export async function POST(req: NextRequest) {
       return Response.json({ room: existing })
     }
 
-    // 새 채팅방 생성
     const room = await db.chatRoom.create({
       data: {
         type,

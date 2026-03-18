@@ -3,30 +3,21 @@ import { db } from '@/lib/db'
 import { verifyAccessToken, handleError } from '@/lib/auth'
 
 // GET /api/chat/unread — 안읽은 채팅 메시지 총 개수
+// role 무관하게 내가 참여한 방(user_id OR seller_id) 기준으로 계산
 export async function GET(req: NextRequest) {
   try {
     const user = verifyAccessToken(req)
 
-    let roomIds: string[]
-
-    if (user.role === 'admin' || user.role === 'manager') {
-      const rooms = await db.chatRoom.findMany({
-        where: { type: 'admin' },
-        select: { id: true },
-      })
-      roomIds = rooms.map(r => r.id)
-    } else {
-      const rooms = await db.chatRoom.findMany({
-        where: {
-          OR: [
-            { user_id: user.userId },
-            { seller_id: user.userId },
-          ],
-        },
-        select: { id: true },
-      })
-      roomIds = rooms.map(r => r.id)
-    }
+    const rooms = await db.chatRoom.findMany({
+      where: {
+        OR: [
+          { user_id: user.userId },
+          { seller_id: user.userId },
+        ],
+      },
+      select: { id: true },
+    })
+    const roomIds = rooms.map((r: { id: string }) => r.id)
 
     const count = await db.chatMessage.count({
       where: {

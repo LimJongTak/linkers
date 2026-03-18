@@ -27,7 +27,7 @@ export default function AdminChatPage() {
     if (user.role !== 'admin' && user.role !== 'manager') {
       router.replace('/'); return
     }
-    fetch('/api/chat/rooms', {
+    fetch('/api/chat/rooms?context=admin', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then(r => r.ok ? r.json() : { rooms: [] })

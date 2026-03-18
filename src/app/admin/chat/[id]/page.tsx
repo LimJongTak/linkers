@@ -45,7 +45,7 @@ export default function AdminChatRoomPage() {
     if (user.role !== 'admin' && user.role !== 'manager') return
     const h = { Authorization: `Bearer ${accessToken}` }
 
-    fetch('/api/chat/rooms', { headers: h })
+    fetch('/api/chat/rooms?context=admin', { headers: h })
       .then(r => r.ok ? r.json() : { rooms: [] })
       .then(d => {
         const found = d.rooms?.find((r: ChatRoom) => r.id === id)
