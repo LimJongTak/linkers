@@ -35,11 +35,14 @@ function FileIcon({ name }: { name: string }) {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   const map: Record<string, string> = {
     pdf: '📄', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊',
-    ppt: '📊', pptx: '📊', zip: '🗜️', rar: '🗜️', txt: '📃',
-    hwp: '📝', csv: '📊',
+    ppt: '📊', pptx: '📊', zip: '🗜️', rar: '🗜️', txt: '📃', hwp: '📝', csv: '📊',
   }
   return <>{map[ext] ?? '📎'}</>
 }
+
+const TYPING_SIGNAL_INTERVAL = 2000 // 타이핑 신호 발송 최소 간격 (ms)
+const STATUS_POLL_INTERVAL = 2000   // 상태 폴링 간격 (ms)
+const MSG_POLL_INTERVAL = 3000      // 메시지 폴링 간격 (ms)
 
 export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }: ChatRoomProps) {
   const { user, accessToken } = useAuth()
@@ -47,6 +50,9 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isOtherTyping, setIsOtherTyping] = useState(false)
+  const [readIds, setReadIds] = useState<Set<string>>(new Set())
+
   // Image attachment
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
@@ -59,6 +65,7 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastMsgTimeRef = useRef<string | null>(null)
   const attachInputRef = useRef<HTMLInputElement>(null)
+  const lastTypingSentRef = useRef<number>(0)
 
   // Initial load
   useEffect(() => {
@@ -71,13 +78,16 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
         const msgs: Message[] = d.messages ?? []
         setMessages(msgs)
         if (msgs.length > 0) lastMsgTimeRef.current = msgs[msgs.length - 1].created_at
+        // 초기 읽음 상태 반영
+        const initialRead = new Set(msgs.filter(m => m.sender_id === user.id && m.is_read).map(m => m.id))
+        setReadIds(initialRead)
       })
       .finally(() => setLoading(false))
 
     fetch(`/api/chat/rooms/${roomId}/read`, { method: 'PATCH', headers: h })
   }, [roomId, user, accessToken])
 
-  // Polling every 3 seconds
+  // 메시지 폴링
   useEffect(() => {
     if (!accessToken) return
     const poll = setInterval(() => {
@@ -102,25 +112,55 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
             })
           }
         })
-    }, 3000)
+    }, MSG_POLL_INTERVAL)
     return () => clearInterval(poll)
+  }, [roomId, accessToken])
+
+  // 상태 폴링 (타이핑 + 읽음)
+  useEffect(() => {
+    if (!accessToken || !user) return
+    const poll = setInterval(() => {
+      fetch(`/api/chat/rooms/${roomId}/status`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (!d) return
+          setIsOtherTyping(d.isTyping ?? false)
+          if (d.readMessageIds?.length > 0) {
+            setReadIds(prev => {
+              const next = new Set(prev)
+              d.readMessageIds.forEach((id: string) => next.add(id))
+              return next
+            })
+          }
+        })
+    }, STATUS_POLL_INTERVAL)
+    return () => clearInterval(poll)
+  }, [roomId, accessToken, user])
+
+  // 타이핑 신호 전송 (디바운스)
+  const sendTypingSignal = useCallback(() => {
+    const now = Date.now()
+    if (now - lastTypingSentRef.current < TYPING_SIGNAL_INTERVAL) return
+    lastTypingSentRef.current = now
+    fetch(`/api/chat/rooms/${roomId}/typing`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }).catch(() => {})
   }, [roomId, accessToken])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, isOtherTyping])
 
   const clearPendingImage = useCallback(() => {
     if (previewSrc) URL.revokeObjectURL(previewSrc)
-    setPreviewSrc(null)
-    setPendingImageUrl(null)
-    setImageUploading(false)
+    setPreviewSrc(null); setPendingImageUrl(null); setImageUploading(false)
   }, [previewSrc])
 
   const clearPendingFile = useCallback(() => {
-    setPendingFileUrl(null)
-    setPendingFileName(null)
-    setFileUploading(false)
+    setPendingFileUrl(null); setPendingFileName(null); setFileUploading(false)
   }, [])
 
   const handleAttachSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,66 +169,34 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
     e.target.value = ''
 
     if (file.type.startsWith('image/')) {
-      // ─── Image ───
-      if (file.size > 10 * 1024 * 1024) {
-        alert('이미지 파일 크기는 10MB 이하여야 합니다')
-        return
-      }
+      if (file.size > 10 * 1024 * 1024) { alert('이미지 파일 크기는 10MB 이하여야 합니다'); return }
       const localPreview = URL.createObjectURL(file)
-      setPreviewSrc(localPreview)
-      setImageUploading(true)
-      setPendingImageUrl(null)
+      setPreviewSrc(localPreview); setImageUploading(true); setPendingImageUrl(null)
       try {
-        const form = new FormData()
-        form.append('image', file)
+        const form = new FormData(); form.append('image', file)
         const res = await fetch(`/api/chat/rooms/${roomId}/image`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: form,
+          method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form,
         })
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}))
-          throw new Error(d.error ?? '이미지 업로드에 실패했습니다')
-        }
-        const { imageUrl } = await res.json()
-        setPendingImageUrl(imageUrl)
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? '이미지 업로드에 실패했습니다')
+        setPendingImageUrl((await res.json()).imageUrl)
       } catch (err: any) {
         alert(err.message ?? '이미지 업로드에 실패했습니다')
-        setPreviewSrc(null)
-        URL.revokeObjectURL(localPreview)
-      } finally {
-        setImageUploading(false)
-      }
+        setPreviewSrc(null); URL.revokeObjectURL(localPreview)
+      } finally { setImageUploading(false) }
     } else {
-      // ─── File ───
-      if (file.size > 20 * 1024 * 1024) {
-        alert('파일 크기는 20MB 이하여야 합니다')
-        return
-      }
-      setFileUploading(true)
-      setPendingFileUrl(null)
-      setPendingFileName(file.name)
+      if (file.size > 20 * 1024 * 1024) { alert('파일 크기는 20MB 이하여야 합니다'); return }
+      setFileUploading(true); setPendingFileName(file.name); setPendingFileUrl(null)
       try {
-        const form = new FormData()
-        form.append('file', file)
+        const form = new FormData(); form.append('file', file)
         const res = await fetch(`/api/chat/rooms/${roomId}/file`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: form,
+          method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form,
         })
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}))
-          throw new Error(d.error ?? '파일 업로드에 실패했습니다')
-        }
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? '파일 업로드에 실패했습니다')
         const { fileUrl, fileName } = await res.json()
-        setPendingFileUrl(fileUrl)
-        setPendingFileName(fileName)
+        setPendingFileUrl(fileUrl); setPendingFileName(fileName)
       } catch (err: any) {
-        alert(err.message ?? '파일 업로드에 실패했습니다')
-        setPendingFileName(null)
-      } finally {
-        setFileUploading(false)
-      }
+        alert(err.message ?? '파일 업로드에 실패했습니다'); setPendingFileName(null)
+      } finally { setFileUploading(false) }
     }
   }, [roomId, accessToken])
 
@@ -196,9 +204,8 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
     const hasText = !!input.trim()
     const hasImage = !!pendingImageUrl
     const hasFile = !!pendingFileUrl
-    const uploading = imageUploading || fileUploading
-
-    if ((!hasText && !hasImage && !hasFile) || sending || uploading) return
+    const up = imageUploading || fileUploading
+    if ((!hasText && !hasImage && !hasFile) || sending || up) return
 
     setSending(true)
     try {
@@ -249,6 +256,19 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
 
   return (
     <>
+      <style>{`
+        @keyframes _chatDotBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+        ._chatDot {
+          width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF; display: inline-block;
+          animation: _chatDotBounce 1.3s ease-in-out infinite;
+        }
+        ._chatDot:nth-child(2) { animation-delay: 0.18s; }
+        ._chatDot:nth-child(3) { animation-delay: 0.36s; }
+      `}</style>
+
       {/* Header */}
       <div style={{
         background: '#fff', borderBottom: '1px solid #F0EDE8', padding: '14px 20px',
@@ -279,6 +299,7 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
         ) : (
           messages.map((msg, i) => {
             const isMine = msg.sender_id === user?.id
+            const isRead = isMine && (readIds.has(msg.id) || msg.is_read)
             const showDate = i === 0 ||
               new Date(messages[i - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString()
 
@@ -322,8 +343,7 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
                             background: isMine ? 'rgba(255,255,255,0.15)' : '#F3F4F6',
                             borderRadius: 10, padding: '8px 12px',
                             color: isMine ? '#fff' : '#374151', textDecoration: 'none',
-                            fontSize: 13, marginBottom: msg.content ? 8 : 0,
-                            maxWidth: 220,
+                            fontSize: 13, marginBottom: msg.content ? 8 : 0, maxWidth: 220,
                           }}>
                           <span style={{ fontSize: 18, flexShrink: 0 }}><FileIcon name={msg.file_name ?? ''} /></span>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -333,8 +353,20 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
                       )}
                       {msg.content && <span>{msg.content}</span>}
                     </div>
-                    <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 3, textAlign: isMine ? 'right' : 'left' }}>
-                      {new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+
+                    {/* 시간 + 읽음 표시 */}
+                    <div style={{
+                      fontSize: 10, color: '#9CA3AF', marginTop: 3,
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      justifyContent: isMine ? 'flex-end' : 'flex-start',
+                    }}>
+                      {isMine && !isRead && (
+                        <span style={{ color: '#F59E0B', fontWeight: 700, fontSize: 11 }}>1</span>
+                      )}
+                      {isMine && isRead && (
+                        <span style={{ color: '#9CA3AF' }}>읽음</span>
+                      )}
+                      <span>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
                 </div>
@@ -342,6 +374,24 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
             )
           })
         )}
+
+        {/* 타이핑 인디케이터 */}
+        {isOtherTyping && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+            {renderAvatar(32, 13)}
+            <div style={{
+              background: '#fff', border: '1px solid #F0EDE8',
+              borderRadius: '18px 18px 18px 4px',
+              padding: '12px 16px',
+              display: 'flex', gap: 5, alignItems: 'center',
+            }}>
+              <span className="_chatDot" />
+              <span className="_chatDot" />
+              <span className="_chatDot" />
+            </div>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -378,7 +428,7 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
 
           {/* File preview */}
           {(pendingFileName && !previewSrc) && (
-            <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ marginBottom: 8 }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 background: '#F3F4F6', borderRadius: 10, padding: '6px 10px',
@@ -397,10 +447,8 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
           )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-            {/* Hidden file input — accepts all files */}
             <input ref={attachInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachSelect} />
 
-            {/* Attach button */}
             <button
               onClick={() => attachInputRef.current?.click()}
               disabled={uploading}
@@ -420,7 +468,7 @@ export default function ChatRoom({ roomId, backHref, myBubbleColor, otherParty }
 
             <textarea
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => { setInput(e.target.value); sendTypingSignal() }}
               onKeyDown={handleKeyDown}
               placeholder="메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"
               rows={1}

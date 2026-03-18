@@ -475,6 +475,15 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+model ChatTyping {
+  room_id  String
+  user_id  String
+  typed_at DateTime
+
+  @@id([room_id, user_id])
+  @@map("chat_typing")
+}
+
 model GiftCardUsage {
   id       String   @id @default(uuid())
   pin      String   @unique

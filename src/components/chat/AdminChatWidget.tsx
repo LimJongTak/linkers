@@ -12,6 +12,7 @@ interface Message {
   file_url: string | null
   file_name: string | null
   sender_id: string
+  is_read: boolean
   created_at: string
   sender: { id: string; nickname: string; profile_image: string | null; role: string }
 }
@@ -25,7 +26,10 @@ function FileIcon({ name }: { name: string }) {
   return <>{map[ext] ?? '📎'}</>
 }
 
-const BUBBLE = 'linear-gradient(135deg,#7C3AED,#4F46E5)'
+const BUBBLE_BG = 'linear-gradient(135deg,#7C3AED,#4F46E5)'
+const TYPING_SIGNAL_INTERVAL = 2000
+const STATUS_POLL_INTERVAL = 2000
+const MSG_POLL_INTERVAL = 3000
 
 export default function AdminChatWidget() {
   const { user, accessToken } = useAuth()
@@ -39,6 +43,8 @@ export default function AdminChatWidget() {
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [isOtherTyping, setIsOtherTyping] = useState(false)
+  const [readIds, setReadIds] = useState<Set<string>>(new Set())
 
   // Attachment
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null)
@@ -50,11 +56,12 @@ export default function AdminChatWidget() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastMsgRef = useRef<string | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const msgPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const statusPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const attachRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const lastTypingSentRef = useRef<number>(0)
 
-  // Decide whether to show at all
   const hide =
     !user ||
     user.role === 'admin' ||
@@ -74,9 +81,8 @@ export default function AdminChatWidget() {
       })
   }, [hide, accessToken])
 
-  // Load messages for a room
   const loadMessages = useCallback(async (id: string) => {
-    if (!accessToken) return
+    if (!accessToken || !user) return
     setLoading(true)
     try {
       const d = await fetch(`/api/chat/rooms/${id}/messages`, {
@@ -86,13 +92,14 @@ export default function AdminChatWidget() {
       setMessages(msgs)
       if (msgs.length > 0) lastMsgRef.current = msgs[msgs.length - 1].created_at
       setUnread(0)
+      const initialRead = new Set(msgs.filter(m => m.sender_id === user.id && m.is_read).map(m => m.id))
+      setReadIds(initialRead)
       fetch(`/api/chat/rooms/${id}/read`, { method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}` } })
     } finally {
       setLoading(false)
     }
-  }, [accessToken])
+  }, [accessToken, user])
 
-  // Open button click
   const handleOpen = useCallback(async () => {
     if (!user || !accessToken) return
     if (isOpen) { setIsOpen(false); return }
@@ -117,13 +124,13 @@ export default function AdminChatWidget() {
     setIsOpen(true)
   }, [user, accessToken, isOpen, roomId, loadMessages])
 
-  // Polling
+  // 메시지 폴링
   useEffect(() => {
     if (!isOpen || !roomId || !accessToken) {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      if (msgPollRef.current) { clearInterval(msgPollRef.current); msgPollRef.current = null }
       return
     }
-    pollRef.current = setInterval(() => {
+    msgPollRef.current = setInterval(() => {
       const since = lastMsgRef.current
       const url = since
         ? `/api/chat/rooms/${roomId}/messages?since=${encodeURIComponent(since)}`
@@ -144,13 +151,47 @@ export default function AdminChatWidget() {
             })
           }
         })
-    }, 3000)
-    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
+    }, MSG_POLL_INTERVAL)
+    return () => { if (msgPollRef.current) { clearInterval(msgPollRef.current); msgPollRef.current = null } }
   }, [isOpen, roomId, accessToken])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  // 상태 폴링 (타이핑 + 읽음)
+  useEffect(() => {
+    if (!isOpen || !roomId || !accessToken) {
+      if (statusPollRef.current) { clearInterval(statusPollRef.current); statusPollRef.current = null }
+      setIsOtherTyping(false)
+      return
+    }
+    statusPollRef.current = setInterval(() => {
+      fetch(`/api/chat/rooms/${roomId}/status`, { headers: { Authorization: `Bearer ${accessToken}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (!d) return
+          setIsOtherTyping(d.isTyping ?? false)
+          if (d.readMessageIds?.length > 0) {
+            setReadIds(prev => {
+              const next = new Set(prev)
+              d.readMessageIds.forEach((id: string) => next.add(id))
+              return next
+            })
+          }
+        })
+    }, STATUS_POLL_INTERVAL)
+    return () => { if (statusPollRef.current) { clearInterval(statusPollRef.current); statusPollRef.current = null } }
+  }, [isOpen, roomId, accessToken])
 
-  // Attachment handlers
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isOtherTyping])
+
+  const sendTypingSignal = useCallback(() => {
+    if (!roomId || !accessToken) return
+    const now = Date.now()
+    if (now - lastTypingSentRef.current < TYPING_SIGNAL_INTERVAL) return
+    lastTypingSentRef.current = now
+    fetch(`/api/chat/rooms/${roomId}/typing`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}` },
+    }).catch(() => {})
+  }, [roomId, accessToken])
+
   const clearImage = useCallback(() => {
     if (previewSrc) URL.revokeObjectURL(previewSrc)
     setPreviewSrc(null); setPendingImageUrl(null); setImageUploading(false)
@@ -222,7 +263,7 @@ export default function AdminChatWidget() {
         setInput('')
         clearImage()
         clearFile()
-        if (textareaRef.current) { textareaRef.current.style.height = 'auto' }
+        if (textareaRef.current) textareaRef.current.style.height = 'auto'
       }
     } finally { setSending(false) }
   }, [roomId, input, sending, imageUploading, fileUploading, pendingImageUrl, pendingFileUrl, pendingFileName, accessToken, clearImage, clearFile])
@@ -234,6 +275,19 @@ export default function AdminChatWidget() {
 
   return (
     <>
+      <style>{`
+        @keyframes _wDotBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
+        ._wDot {
+          width: 7px; height: 7px; border-radius: 50%; background: #9CA3AF; display: inline-block;
+          animation: _wDotBounce 1.3s ease-in-out infinite;
+        }
+        ._wDot:nth-child(2) { animation-delay: 0.18s; }
+        ._wDot:nth-child(3) { animation-delay: 0.36s; }
+      `}</style>
+
       {/* Floating button */}
       <button
         onClick={handleOpen}
@@ -242,7 +296,7 @@ export default function AdminChatWidget() {
         style={{
           position: 'fixed', bottom: 24, right: 24,
           width: 56, height: 56, borderRadius: '50%',
-          background: creating ? '#9CA3AF' : BUBBLE,
+          background: creating ? '#9CA3AF' : BUBBLE_BG,
           color: '#fff', border: 'none',
           cursor: creating ? 'not-allowed' : 'pointer',
           fontSize: 24,
@@ -281,7 +335,7 @@ export default function AdminChatWidget() {
         }}>
           {/* Header */}
           <div style={{
-            background: BUBBLE, color: '#fff',
+            background: BUBBLE_BG, color: '#fff',
             padding: '14px 16px',
             display: 'flex', alignItems: 'center', gap: 10,
             flexShrink: 0,
@@ -295,7 +349,9 @@ export default function AdminChatWidget() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>링커스 고객지원</div>
-              <div style={{ fontSize: 11, opacity: 0.8 }}>관리자가 곧 답변드립니다</div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>
+                {isOtherTyping ? '입력 중...' : '관리자가 곧 답변드립니다'}
+              </div>
             </div>
             {roomId && (
               <Link href={`/my/chat/${roomId}`} onClick={() => setIsOpen(false)}
@@ -323,6 +379,7 @@ export default function AdminChatWidget() {
               messages.map(msg => {
                 const isMine = msg.sender_id === user?.id
                 const isAdmin = msg.sender.role === 'admin' || msg.sender.role === 'manager'
+                const isRead = isMine && (readIds.has(msg.id) || msg.is_read)
                 return (
                   <div key={msg.id} style={{
                     display: 'flex',
@@ -332,9 +389,9 @@ export default function AdminChatWidget() {
                     {!isMine && (
                       <div style={{
                         width: 28, height: 28, borderRadius: '50%',
-                        background: BUBBLE,
+                        background: '#111827', overflow: 'hidden',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        overflow: 'hidden', flexShrink: 0,
+                        flexShrink: 0,
                       }}>
                         <img src="/icon.svg" alt="링커스" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       </div>
@@ -376,20 +433,51 @@ export default function AdminChatWidget() {
                         )}
                         {msg.content && <span>{msg.content}</span>}
                       </div>
-                      <div style={{ fontSize: 9, color: '#9CA3AF', marginTop: 2, textAlign: isMine ? 'right' : 'left' }}>
-                        {new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      {/* 시간 + 읽음 표시 */}
+                      <div style={{
+                        fontSize: 9, color: '#9CA3AF', marginTop: 2,
+                        display: 'flex', alignItems: 'center', gap: 3,
+                        justifyContent: isMine ? 'flex-end' : 'flex-start',
+                      }}>
+                        {isMine && !isRead && (
+                          <span style={{ color: '#F59E0B', fontWeight: 700, fontSize: 10 }}>1</span>
+                        )}
+                        {isMine && isRead && (
+                          <span style={{ color: '#9CA3AF' }}>읽음</span>
+                        )}
+                        <span>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   </div>
                 )
               })
             )}
+
+            {/* 타이핑 인디케이터 */}
+            {isOtherTyping && (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', background: '#111827', overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <img src="/icon.svg" alt="링커스" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
+                <div style={{
+                  background: '#F3F4F6', borderRadius: '14px 14px 14px 4px',
+                  padding: '10px 14px', display: 'flex', gap: 4, alignItems: 'center',
+                }}>
+                  <span className="_wDot" />
+                  <span className="_wDot" />
+                  <span className="_wDot" />
+                </div>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
 
           {/* Input */}
           <div style={{ borderTop: '1px solid #F0EDE8', padding: '8px 10px', flexShrink: 0 }}>
-            {/* Image preview */}
             {(previewSrc || imageUploading) && (
               <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -403,10 +491,9 @@ export default function AdminChatWidget() {
                 </div>
               </div>
             )}
-            {/* File preview */}
             {pendingFileName && !previewSrc && (
               <div style={{ marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#374151', maxWidth: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F4F6', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#374151' }}>
                   <span style={{ fontSize: 14 }}><FileIcon name={pendingFileName} /></span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{pendingFileName}</span>
                   {fileUploading && <span style={{ color: '#9CA3AF', flexShrink: 0 }}>업로드 중...</span>}
@@ -423,7 +510,7 @@ export default function AdminChatWidget() {
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={e => { setInput(e.target.value); sendTypingSignal() }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                 placeholder="메시지 입력..."
                 rows={1}
