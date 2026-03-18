@@ -15,6 +15,7 @@ export async function GET(
         id: true,
         nickname: true,
         profile_image: true,
+        bio: true,
         created_at: true,
         programs: {
           where: { status: 'active' },
@@ -46,6 +47,7 @@ export async function GET(
         id: seller.id,
         nickname: seller.nickname,
         profileImage: seller.profile_image,
+        bio: seller.bio ?? null,
         joinedAt: seller.created_at,
         programCount: seller._count.programs,
         totalReviews: reviewAgg._count.id,

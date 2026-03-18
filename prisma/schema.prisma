@@ -16,6 +16,7 @@ model User {
   oauth_id       String
   password_hash  String?
   profile_image  String?
+  bio            String?  @db.Text
   phone          String?
   push_token     String?
   points         Int       @default(0)

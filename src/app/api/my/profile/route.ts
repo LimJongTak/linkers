@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const auth = verifyAccessToken(req)
     const user = await db.user.findUnique({
       where: { id: auth.userId },
-      select: { id: true, nickname: true, email: true, phone: true, profile_image: true, oauth_provider: true, role: true },
+      select: { id: true, nickname: true, email: true, phone: true, profile_image: true, bio: true, oauth_provider: true, role: true },
     })
     if (!user) throw new ApiError(404, '사용자를 찾을 수 없습니다')
     return Response.json({ user })
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const auth = verifyAccessToken(req)
-    const { nickname, phone, profile_image, role } = await req.json()
+    const { nickname, phone, profile_image, role, bio } = await req.json()
 
     if (nickname !== undefined) {
       if (typeof nickname !== 'string' || nickname.trim().length < 2) {
@@ -37,16 +37,21 @@ export async function PUT(req: NextRequest) {
       throw new ApiError(400, '유효하지 않은 역할입니다')
     }
 
+    if (bio !== undefined && bio !== null && typeof bio === 'string' && bio.length > 200) {
+      throw new ApiError(400, '소개 메시지는 200자 이하여야 합니다')
+    }
+
     const data: Record<string, string | null> = {}
     if (nickname !== undefined) data.nickname = nickname.trim()
     if (phone !== undefined) data.phone = phone || null
     if (profile_image !== undefined) data.profile_image = profile_image || null
     if (role !== undefined) data.role = role
+    if (bio !== undefined) data.bio = bio?.trim() || null
 
     const updated = await db.user.update({
       where: { id: auth.userId },
       data,
-      select: { id: true, nickname: true, email: true, phone: true, profile_image: true, role: true },
+      select: { id: true, nickname: true, email: true, phone: true, profile_image: true, bio: true, role: true },
     })
 
     return Response.json({ user: updated })

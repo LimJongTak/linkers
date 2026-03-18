@@ -26,6 +26,7 @@ interface SellerProfile {
   id: string
   nickname: string
   profileImage: string | null
+  bio: string | null
   joinedAt: string
   programCount: number
   totalReviews: number
@@ -123,7 +124,12 @@ export default function SellerProfilePage() {
             }
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', marginBottom: 6 }}>{seller.nickname}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>{joinYear}년부터 활동 중</div>
+          {seller.bio && (
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, maxWidth: 400, margin: '0 auto 8px', wordBreak: 'break-word' }}>
+              {seller.bio}
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>{joinYear}년부터 활동 중</div>
           {user?.id !== id && (
             <button onClick={handleChat} disabled={chatLoading}
               style={{ background: chatLoading ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 10, padding: '10px 22px', fontSize: 13, fontWeight: 800, cursor: chatLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginBottom: 20, backdropFilter: 'blur(4px)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>

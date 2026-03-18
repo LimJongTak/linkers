@@ -12,6 +12,7 @@ interface Profile {
   email: string | null
   phone: string | null
   profile_image: string | null
+  bio: string | null
   oauth_provider: string
   role: string
 }
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [nickname, setNickname] = useState('')
   const [phone, setPhone] = useState('')
+  const [bio, setBio] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -49,6 +51,7 @@ export default function ProfilePage() {
         setProfile(d.user)
         setNickname(d.user.nickname ?? '')
         setPhone(d.user.phone ?? '')
+        setBio(d.user.bio ?? '')
       })
   }, [user, accessToken, router])
 
@@ -57,7 +60,7 @@ export default function ProfilePage() {
     const res = await fetch('/api/my/profile', {
       method: 'PUT',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname, phone }),
+      body: JSON.stringify({ nickname, phone, bio }),
     })
     const d = await res.json()
     setSaving(false)
@@ -220,7 +223,7 @@ export default function ProfilePage() {
             <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>이메일은 변경할 수 없습니다</div>
           </div>
 
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 14 }}>
             <label style={LABEL}>전화번호</label>
             <input
               style={INPUT}
@@ -228,6 +231,19 @@ export default function ProfilePage() {
               onChange={e => setPhone(e.target.value)}
               placeholder="010-0000-0000"
               maxLength={13}
+            />
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={LABEL}>
+              소개 메시지
+              <span style={{ fontWeight: 400, color: '#9CA3AF', marginLeft: 6 }}>({bio.length}/200)</span>
+            </label>
+            <textarea
+              style={{ ...INPUT, resize: 'none', height: 88, lineHeight: 1.6 }}
+              value={bio}
+              onChange={e => setBio(e.target.value.slice(0, 200))}
+              placeholder="자신을 간단히 소개해주세요. 다른 사용자의 프로필에서 표시됩니다."
             />
           </div>
 

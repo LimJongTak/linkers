@@ -10,12 +10,17 @@ export default function MyPage() {
   const { user, logout, accessToken } = useAuth()
   const router = useRouter()
   const [points, setPoints] = useState<number | null>(null)
+  const [bio, setBio] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return }
     fetch('/api/points', { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(r => r.json())
       .then(d => setPoints(d.points ?? 0))
+      .catch(() => {})
+    fetch('/api/my/profile', { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setBio(d?.user?.bio ?? null))
       .catch(() => {})
   }, [user, accessToken, router])
 
@@ -60,9 +65,14 @@ export default function MyPage() {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nickname}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: bio ? 4 : 0 }}>
               {user.role === 'admin' ? '관리자 계정' : user.role === 'manager' ? '매니저 계정' : '구매 · 판매 계정'}
             </div>
+            {bio && (
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {bio}
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
             <div style={{ background: 'rgba(79,195,247,0.2)', color: '#4FC3F7', fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 8 }}>
