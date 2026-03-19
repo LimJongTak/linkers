@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyAccessToken, ApiError, handleError } from '@/lib/auth'
+import { awardReviewPoints } from '@/lib/pointReward'
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,7 +47,10 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return Response.json({ review }, { status: 201 })
+    // 리뷰 작성 포인트 적립
+    const awardedPoints = await awardReviewPoints(user.userId, review.id)
+
+    return Response.json({ review, awardedPoints }, { status: 201 })
   } catch (err) {
     return handleError(err)
   }

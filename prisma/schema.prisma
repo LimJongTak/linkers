@@ -508,6 +508,7 @@ enum PointTransactionType {
   charge_admin
   purchase
   purchase_reward
+  review_reward
   refund
 }
 

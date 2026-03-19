@@ -32,6 +32,13 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    if (key === 'review_reward_amount') {
+      const amount = parseInt(value, 10)
+      if (isNaN(amount) || amount < 0) {
+        throw new ApiError(400, '리뷰 적립 포인트는 0 이상 정수여야 합니다')
+      }
+    }
+
     const setting = await db.adminSetting.upsert({
       where: { key },
       create: { key, value: String(value) },
